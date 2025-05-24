@@ -4,7 +4,7 @@ from django.contrib.auth.views import LoginView
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, redirect
 from django.contrib.auth import get_user_model
-
+from django.contrib import messages
 from .models import CustomUser
 from .forms import CustomUserCreationForm, CustomUserExtraForm, EmailAuthenticationForm
 
@@ -32,15 +32,44 @@ def register_extra_view(request):
         form = CustomUserExtraForm(request.POST, instance=user)
         if form.is_valid():
             form.save()
-            return redirect('home')
+            return redirect('profile')
     else:
         form = CustomUserExtraForm(instance=user)
     return render(request, 'register_extra.html', {'form': form})
 
-
 @login_required
 def profile_view(request):
-    return render(request, 'profile.html', {'user': request.user})
+    user = request.user
+
+    editable_fields = [
+        ('Email', 'email'),
+        ('Role', 'get_role_display'),
+        ('Date of birth', 'date_of_birth'),
+        ('On-site visit', 'can_commute'),
+        ('City', 'city'),
+        ('Password', 'password'),
+    ]
+
+    if request.method == 'POST':
+        field = request.POST.get('field')
+        value = request.POST.get('value')
+
+        if field == 'password':
+            user.set_password(value)
+            user.save()
+            messages.success(request, 'Hasło zostało zmienione. Zaloguj się ponownie.')
+            return redirect('login')
+
+        elif field in ['email', 'first_name', 'last_name', 'date_of_birth', 'can_commute', 'city']:
+            setattr(user, field, value)
+            user.save()
+            messages.success(request, f'Zmieniono pole: {field}')
+            return redirect('profile')
+
+    return render(request, 'profile.html', {
+        'user': user,
+        'editable_fields': editable_fields
+    })
 
 #@login_required
 def user_list_view(request, role):
