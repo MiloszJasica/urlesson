@@ -1,6 +1,17 @@
 {% include "partials/head.html" %}
 
-<div class="px-32 mx-auto min-h-screen flex flex-col">
+  {% if messages %}
+    <div id="messages-container" class="fixed inset-0 flex mt-32 justify-center z-50 pointer-events-none">
+      <div class="space-y-4 text-center w-full max-w-sm">
+        {% for message in messages %}
+          <div class="bg-blue-500 text-white px-4 py-3 rounded shadow-lg pointer-events-auto">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
 
   {% include "partials/navbar.html" %}
 
@@ -8,7 +19,17 @@
   
   {% endblock %}
 
-</div>
-
+  {% include "partials/footer.html" %}
 </body>
 </html>
+
+<script>
+    setTimeout(() => {
+      const container = document.getElementById('messages-container');
+      if (container) {
+        container.style.transition = "opacity 0.5s ease";
+        container.style.opacity = '0';
+        setTimeout(() => container.remove(), 500);
+      }
+    }, 3000);
+  </script>

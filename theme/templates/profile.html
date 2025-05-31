@@ -2,13 +2,12 @@
 {% load custom_tags %}
 
 {% block content %}
-<div class="bg-gray-900 text-white p-6">
-  <h2 class="text-2xl underline mb-4">My profile</h2>
-
+<div class="bg-gray-900 text-white p-32">
+  <h2 class="text-5xl underline mb-16">My profile</h2>
   {% for label, field in editable_fields %}
     <div class="mb-4" id="field-{{ field }}">
-      <div class="flex items-center justify-between">
-        <p class="mb-1 font-semibold">{{ label }}:
+      <div class="flex w-[50%] items-center justify-between">
+        <p class="text-2xl mb-1 font-semibold">{{ label }}:
           {% if field == 'get_role_display' %}
             {{ user.get_role_display }}
           {% elif field == 'password' %}
@@ -18,30 +17,46 @@
           {% endif %}
         </p>
 
-        {% if field != 'get_role_display' %}
-          <button class="edit-btn bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" data-field="{{ field }}">
-            Edytuj
+        {% if field == 'password' or field == 'city' %}
+          <button class="edit-btn text-2xl bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded" data-field="{{ field }}">
+            Edit
           </button>
         {% endif %}
       </div>
 
-      <form method="post" class="edit-form hidden mt-2" data-field="{{ field }}">
+      <form method="post" class="edit-form {% if field == 'password' and show_password_form %}block{% else %}hidden{% endif %} mt-2" data-field="{{ field }}">
         {% csrf_token %}
         <input type="hidden" name="field" value="{{ field }}">
 
         {% if field == 'password' %}
-          <input type="password" name="value" class="text-black px-2 py-1 rounded" placeholder="Nowe hasło">
+          <div>
+            {{ password_form.new_password1|add_class:"text-black px-2 py-1 rounded" }}
+            {% if password_form.new_password1.errors %}
+              <p class="text-red-400 text-sm mt-1">{{ password_form.new_password1.errors.0 }}</p>
+            {% endif %}
+          </div>
+          <div class="mt-2">
+            {{ password_form.new_password2|add_class:"text-black px-2 py-1 rounded" }}
+            {% if password_form.new_password2.errors %}
+              <p class="text-red-400 text-sm mt-1">{{ password_form.new_password2.errors.0 }}</p>
+            {% endif %}
+          </div>
         {% elif field == 'email' %}
           <input type="email" name="value" class="text-black px-2 py-1 rounded" value="{{ user.email }}">
         {% else %}
           <input type="text" name="value" class="text-black px-2 py-1 rounded" value="{{ user|attr:field }}">
         {% endif %}
 
-        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded ml-2">OK</button>
-        <button type="button" class="cancel-btn bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded ml-1">Anuluj</button>
+        <button type="submit" class="text-xl bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded ml-2">OK</button>
+        <button type="button" class="cancel-btn text-xl bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded ml-1">Cancel</button>
       </form>
     </div>
   {% endfor %}
+  {% if user.is_teacher %}
+          <a href="{% url 'teacher_pricing' %}" class="text-3xl inline-block mb-4 px-4 py-2 bg-green-600 text-white rounded">
+            Set lesson price
+          </a>
+      {% endif %}
 </div>
 
 <script>

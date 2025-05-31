@@ -1,20 +1,22 @@
 {% load static tailwind_tags %}
 
-<nav class="flex items-center justify-between py-4 border-b border-gray-700">
-  <div class="flex">
-    <div class="text-lg flex">
-      <a href="/"><img src="{% static 'urlesson.png' %}" class="w-64 h-[auto] -mb-16 -mt-8" alt="urlesson"></a>
+<nav class="border-gray-800">
+  <div class="flex items-center bg-gray-800 justify-between py-4 border-b border-gray-500 px-32">
+    <div class="flex">
+      <div class="text-lg flex">
+        <a href="/"><img src="{% static 'urlesson.png' %}" class="w-64 h-[auto] -mb-16 -mt-8" alt="urlesson"></a>
+      </div>
+      <a href="{% url 'user_list' %}" class="hover:underline ml-8 px-4 py-8 text-3xl underline">Users</a>
     </div>
-    <a href="{% url 'user_list' 'teacher' %}" class="hover:underline ml-8 px-4 py-8 text-2xl">Users</a>
-  </div>
 
-  <div class="flex text-2xl">
-    {% if user.is_authenticated %}
-      <a href="{% url 'profile' %}" class="hover:underline px-4">My Profile</a>
-      <a href="{% url 'logout' %}" class="hover:underline px-4">Logout</a>
-    {% else %}
-      <a href="{% url 'login' %}" class="hover:underline px-4">Login</a>
-      <a href="{% url 'register' %}" class="hover:underline">Register</a>
-    {% endif %}
+    <div class="flex text-2xl gap-4">
+      {% if user.is_authenticated %}
+        <a href="{% url 'profile' %}" class="bg-green-500 text-black hover:bg-blue-500 text-3xl px-4 py-2 border-black rounded">My Profile</a>
+        <a href="{% url 'logout' %}" class="bg-yellow-500 hover:bg-red-500 text-black text-3xl px-4 py-2 border-black rounded">Logout</a>
+      {% else %}
+        <a href="{% url 'login' %}" class="bg-green-500 text-black hover:bg-blue-500 text-3xl px-4 py-2 border-black rounded">Login</a>
+        <a href="{% url 'register' %}" class="bg-yellow-500 text-black text-3xl hover:bg-red-500 px-4 py-2 border-black rounded">Register</a>
+      {% endif %}
+    </div>
   </div>
 </nav>
