@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="text-2xl font-bold mb-4 px-32">Lesson Calendar</h2>
+<div id='calendar' class="max-w-5xl mx-auto"></div>
+
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'timeGridWeek',
+      allDaySlot: false,
+      selectable: true,
+      events: {
+        url: "{% url 'lesson_calendar_json' %}",
+        extraParams: { teacher_id: "{{ teacher.id }}" }
+      },
+      select: function(info) {
+        const start = new Date(info.start);
+        const date = start.toISOString().split("T")[0];
+        const time = start.toTimeString().split(" ")[0].slice(0,5);
+
+        document.getElementById("selected-date").value = date;
+        document.getElementById("selected-time").value = time;
+
+        document.getElementById("booking-form").classList.remove("hidden");
+        document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
+      }
+    });
+
+    calendar.render();
+  });
+</script>
+
+
+{% endblock %}

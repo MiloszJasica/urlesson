@@ -1,12 +1,19 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.conf import settings
+from decimal import Decimal
 
 class CustomUser(AbstractUser):
-    username = None 
+    username = None
     ROLE_CHOICES = (
         ('student', 'Student'),
         ('teacher', 'Teacher'),
+    )
+
+    GENDER_CHOICES = (
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
     )
 
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
@@ -14,20 +21,23 @@ class CustomUser(AbstractUser):
     can_commute = models.BooleanField(default=False)
     city = models.CharField(max_length=100, blank=True)
     email = models.EmailField(unique=True)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True)
 
-    USERNAME_FIELD = 'email'  
-    REQUIRED_FIELDS = ['role'] 
-    
-    lesson_price_45min = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
-    lesson_price_60min = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
-    group_lesson_base_price = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
-    group_price_per_additional_student = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['role']
+
+    price_per_minute_individual = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    price_per_minute_group = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    extra_student_group_minute_price = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
+    recurring_discount_percent = models.PositiveIntegerField(default=0, help_text="Discount % for recurring lessons")
 
     def is_teacher(self):
         return self.role == 'teacher'
 
     def is_student(self):
         return self.role == 'student'
+
 
 class LessonRequest(models.Model):
     student = models.ForeignKey(
@@ -42,19 +52,19 @@ class LessonRequest(models.Model):
     )
 
     DURATION_CHOICES = [
-        (45, '45 minut'),
-        (60, '60 minut'),
+        (45, '45 minutes'),
+        (60, '60 minutes'),
     ]
 
     date = models.DateField()
     time = models.TimeField()
     duration_minutes = models.PositiveIntegerField(choices=DURATION_CHOICES, default=60)
-
     is_one_time = models.BooleanField(default=True)
-    is_recurring = models.BooleanField(default=False)
     is_group = models.BooleanField(default=False)
 
-    final_price = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    repeat_weeks = models.PositiveIntegerField(default=1, help_text="Number of weekly lessons (1 = one-time)")
+
+    final_price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=[
         ('pending', 'Pending'),
@@ -65,46 +75,42 @@ class LessonRequest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        if self.teacher and self.duration_minutes:
+        if self.teacher.price_per_minute_individual:
+            price = self.teacher.price_per_minute_individual * Decimal(self.duration_minutes)
+
             if self.is_group:
-                base_price = self.teacher.group_lesson_base_price or 0
-                extra_price = self.teacher.group_price_per_additional_student or 0
-                num_students = getattr(self, 'students_count', 1) 
-                self.final_price = base_price + extra_price * max(0, num_students - 2)
-            else:
-                if self.duration_minutes == 45:
-                    self.final_price = self.teacher.lesson_price_45min
-                elif self.duration_minutes == 60:
-                    self.final_price = self.teacher.lesson_price_60min
+                try:
+                    num_students = self.invited_students.count() + 1 
+                except AttributeError:
+                    num_students = 2
+
+                price = self.teacher.price_per_minute_group * Decimal(self.duration_minutes)
+                if num_students > 2:
+                    price += self.teacher.extra_student_group_minute_price * Decimal(self.duration_minutes) * (num_students - 2)
+
+            self.final_price = price
+
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"{self.date} {self.time} - {self.student.email} → {self.teacher.email}"
-
-
-class GroupLessonInvite(models.Model):
-    lesson_request = models.ForeignKey(LessonRequest, on_delete=models.CASCADE)
-    invited_student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    accepted = models.BooleanField(null=True)  # None if no one response
-
-    def __str__(self):
-        return f"{self.invited_student.email} → {self.lesson_request}"
-
 class TeacherAvailability(models.Model):
-    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    weekday = models.IntegerField(choices=[(i, day) for i, day in enumerate([
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
-    ])])
+    DAYS_OF_WEEK = [
+        ('mon', 'Monday'),
+        ('tue', 'Tuesday'),
+        ('wed', 'Wednesday'),
+        ('thu', 'Thursday'),
+        ('fri', 'Friday'),
+        ('sat', 'Saturday'),
+        ('sun', 'Sunday'),
+    ]
+
+    teacher = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='availabilities')
+    day = models.CharField(max_length=3, choices=DAYS_OF_WEEK)
     start_time = models.TimeField()
     end_time = models.TimeField()
 
-    def __str__(self):
-        return f"{self.teacher.email} - {self.get_weekday_display()} {self.start_time}–{self.end_time}"
-
-class TeacherUnavailableSlot(models.Model):
-    teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    date = models.DateField()
-    time = models.TimeField()
+    class Meta:
+        unique_together = ('teacher', 'day')
+        ordering = ['day', 'start_time']
 
     def __str__(self):
-        return f"{self.teacher.email} unavailable {self.date} at {self.time}"
+        return f"{self.get_day_display()}: {self.start_time.strftime('%H:%M')} - {self.end_time.strftime('%H:%M')}"

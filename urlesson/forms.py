@@ -6,8 +6,11 @@ from .models import CustomUser, LessonRequest
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import SetPasswordForm
-
-
+from django import forms
+from .models import TeacherAvailability
+from django.db import models
+from django import forms
+from .models import TeacherAvailability
 
 User = get_user_model()
 
@@ -81,53 +84,48 @@ class EmailAuthenticationForm(AuthenticationForm):
         self.user_cache = user
         return cleaned_data
 
-
-
-
 class TeacherPricingForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
-        for field in self.fields:
+        for field in ['price_per_minute_individual', 'price_per_minute_group', 'extra_student_group_minute_price']:
             value = cleaned_data.get(field)
             if value is not None and value < 0:
-                self.add_error(field, "Price must be higher than 0.")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.widget.attrs.update({
-                'class': 'w-full px-3 py-2 rounded text-black',
-            })
+                self.add_error(field, "Price must be greater than or equal to 0.")
 
     class Meta:
         model = CustomUser
         fields = [
-            'lesson_price_45min',
-            'lesson_price_60min',
-            'group_lesson_base_price',
-            'group_price_per_additional_student',
+            'price_per_minute_individual',
+            'price_per_minute_group',
+            'extra_student_group_minute_price',
         ]
         widgets = {
-            'lesson_price_45min': forms.NumberInput(attrs={'step': '1.0'}),
-            'lesson_price_60min': forms.NumberInput(attrs={'step': '1.0'}),
-            'group_lesson_base_price': forms.NumberInput(attrs={'step': '1.0'}),
-            'group_price_per_additional_student': forms.NumberInput(attrs={'step': '1.0'}),
+            'price_per_minute_individual': forms.NumberInput(attrs={'step': '0.01'}),
+            'price_per_minute_group': forms.NumberInput(attrs={'step': '0.01'}),
+            'extra_student_group_minute_price': forms.NumberInput(attrs={'step': '0.01'}),
         }
-
 
 class LessonRequestForm(forms.ModelForm):
     class Meta:
         model = LessonRequest
-        fields = ['date', 'time', 'duration_minutes', 'is_group', 'students']
+        fields = ['date', 'duration_minutes', 'time', 'is_group', 'repeat_weeks']
 
-    students = forms.ModelMultipleChoiceField(
-        queryset=CustomUser.objects.filter(role='student'),
-        widget=forms.CheckboxSelectMultiple,
-        required=True
-    )
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date'}),
+            'time': forms.TimeInput(attrs={'type': 'time'}),
+            'repeat_weeks': forms.NumberInput(attrs={'min': 1, 'class': 'form-input'}),
+        }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['repeat_weeks'].label = "Number of weekly lessons"
         for field in self.fields.values():
             field.widget.attrs.update({
-                'class': 'w-full px-3 py-2 rounded text-black',
+                'class': 'px-3 py-2 rounded text-black',
             })
+
+
+class TeacherAvailabilityForm(forms.ModelForm):
+    class Meta:
+        model = TeacherAvailability
+        fields = ['day', 'start_time', 'end_time']

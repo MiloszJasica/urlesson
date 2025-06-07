@@ -1,5 +1,5 @@
 {% include "partials/head.html" %}
-
+<body class="flex flex-col min-h-screen">
   {% if messages %}
     <div id="messages-container" class="fixed inset-0 flex mt-32 justify-center z-50 pointer-events-none">
       <div class="space-y-4 text-center w-full max-w-sm">
@@ -12,24 +12,24 @@
     </div>
   {% endif %}
 
-
   {% include "partials/navbar.html" %}
 
-  {% block content %}
-  
-  {% endblock %}
+  <main class="flex-grow min-h-screen">
+    {% block content %}
+    {% endblock %}
+  </main>
 
   {% include "partials/footer.html" %}
 </body>
 </html>
 
 <script>
-    setTimeout(() => {
-      const container = document.getElementById('messages-container');
-      if (container) {
-        container.style.transition = "opacity 0.5s ease";
-        container.style.opacity = '0';
-        setTimeout(() => container.remove(), 500);
-      }
-    }, 3000);
-  </script>
+  setTimeout(() => {
+    const container = document.getElementById('messages-container');
+    if (container) {
+      container.style.transition = "opacity 0.5s ease";
+      container.style.opacity = '0';
+      setTimeout(() => container.remove(), 500);
+    }
+  }, 3000);
+</script>

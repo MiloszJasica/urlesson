@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Your Weekly Availability</h2>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit">Add Availability</button>
+</form>
+
+<hr>
+
+<h3>Current Availability:</h3>
+  <ul>
+    {% for a in availabilities %}
+      <li>{{ a.get_day_display }}: {{ a.start_time }} - {{ a.end_time }}</li>
+    {% empty %}
+      <li>No availability set.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

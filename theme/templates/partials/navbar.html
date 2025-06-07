@@ -7,6 +7,12 @@
         <a href="/"><img src="{% static 'urlesson.png' %}" class="w-64 h-[auto] -mb-16 -mt-8" alt="urlesson"></a>
       </div>
       <a href="{% url 'user_list' %}" class="hover:underline ml-8 px-4 py-8 text-3xl underline">Users</a>
+      {% if user.is_authenticated %}
+      <a href="{% url 'calendar' %}" class="hover:underline ml-2 px-4 py-8 text-3xl underline">Calendar</a>
+      {% endif %}
+      {% if user.is_teacher %}
+        <a href="{% url 'teacher_availability' %}" class="hover:underline ml-2 px-4 py-8 text-3xl underline">Availability</a>
+      {% endif %}
     </div>
 
     <div class="flex text-2xl gap-4">

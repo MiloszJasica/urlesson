@@ -1,22 +1,55 @@
-{% extends "base.html" %}
-
+{% extends 'base.html' %}
 {% block content %}
-  <div class="max-w-2xl mx-auto bg-gray-500 p-6 rounded shadow">
-    <h2 class="text-xl font-bold mb-4">Rezerwujesz lekcję z: {{ teacher.first_name }} {{ teacher.last_name }}</h2>
+<div class="px-32 py-8">
+<h2 class="text-xl font-bold mb-4">Book a Lesson with {{ teacher.get_full_name }}</h2>
 
-    <div class="mb-4">
-      <p><strong>Cena za 45 min:</strong> {{ teacher.lesson_price_45min }} PLN</p>
-      <p><strong>Cena za 60 min:</strong> {{ teacher.lesson_price_60min }} PLN</p>
-      <p><strong>Lekcja grupowa:</strong> {{ teacher.group_lesson_base_price }} PLN + {{ teacher.group_price_per_additional_student }} PLN/os.</p>
-    </div>
+<div id="calendar" class="mb-8"></div>
 
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
+<div id="booking-form" class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+  <form method="post" class="bg-gray-600 p-6 w-[600px] h-auto rounded-lg shadow-lg flex flex-col justify-between">
+    <div class="mb-6 text-2xl whitespace-nowrap">Lesson with <span class="underline">{{ teacher.get_full_name }}</span>
+</div>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="hidden" name="selected_date" id="selected-date">
+    <input type="hidden" name="selected_time" id="selected-time">
+    <button type="submit" class="bg-yellow-500 hover:bg-green-500 text-black text-3xl px-4 py-2 border-black rounded mt-8">Book Lesson</button>
+  </form>
+</div>
 
-      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Wyślij prośbę</button>
-    </form>
 
-    <a href="{% url 'user_list' %}?role=teacher" class="mt-4 inline-block text-blue-500">← Powrót</a>
-  </div>
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet'/>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js '></script>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'timeGridWeek',
+      allDaySlot: false,
+      selectable: true,
+      events: {
+        url: "{% url 'lesson_calendar_json' %}",
+        extraParams: { teacher_id: "{{ teacher.id }}" }
+      },
+      select: function(info) {
+        const start = new Date(info.start);
+        const date = start.toISOString().split("T")[0];
+        const time = start.toTimeString().split(" ")[0].slice(0,5);
+
+        document.getElementById("selected-date").value = date;
+        document.getElementById("selected-time").value = time;
+
+        document.querySelector('input[name="date"]').value = date;
+        document.querySelector('input[name="time"]').value = time;
+
+        document.getElementById("booking-form").classList.remove("hidden");
+        document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
+      }
+    });
+
+    calendar.render();
+  });
+</script>
 {% endblock %}
