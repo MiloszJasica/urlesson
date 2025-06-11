@@ -1,26 +1,26 @@
-from django.contrib.auth import login
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LoginView
-from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import render, redirect
-from django.contrib.auth import get_user_model
+from datetime import datetime, timedelta
+
 from django.contrib import messages
-from .models import CustomUser
-from .forms import CustomUserCreationForm, CustomUserExtraForm, EmailAuthenticationForm
-from .forms import TeacherPricingForm
-from django.shortcuts import get_object_or_404
-from .forms import LessonRequestForm
-from .models import CustomUser, LessonRequest
-from django.contrib.auth.forms import SetPasswordForm
-from django.contrib.auth import update_session_auth_hash
-from django.shortcuts import render, redirect
-from .forms import TeacherAvailabilityForm
-from .models import TeacherAvailability
+from django.contrib.auth import get_user_model, login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.views import LoginView
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from .models import TeacherAvailability
+from datetime import datetime, timedelta
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from .models import CustomUser, LessonRequest
 from .forms import LessonRequestForm
-from datetime import timedelta
-from django.http import JsonResponse
-from .models import LessonRequest
+from .forms import (
+    CustomUserCreationForm,
+    CustomUserExtraForm,
+    EmailAuthenticationForm,
+    LessonRequestForm,
+    TeacherAvailabilityForm,
+    TeacherPricingForm,
+)
 
 def home(request):
     return render(request, 'base.html')
@@ -164,37 +164,40 @@ def teacher_availability_view(request):
         'availabilities': availabilities
     })
 
-
-from datetime import datetime, timedelta
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from .models import CustomUser, LessonRequest
-from .forms import LessonRequestForm
-
 @login_required
 def book_lesson_view(request, teacher_id):
     teacher = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
-
     if request.method == 'POST':
         form = LessonRequestForm(request.POST)
         if form.is_valid():
             lesson = form.save(commit=False)
             lesson.student = request.user
             lesson.teacher = teacher
+
             try:
                 selected_date_str = request.POST.get('selected_date')
                 selected_time_str = request.POST.get('selected_time')
                 lesson.date = datetime.strptime(selected_date_str, "%Y-%m-%d").date()
                 lesson.time = datetime.strptime(selected_time_str, "%H:%M").time()
-            except (TypeError, ValueError) as e:
+            except (TypeError, ValueError):
                 form.add_error(None, "Invalid date or time format.")
                 return render(request, 'book_lesson.html', {
                     'form': form,
                     'teacher': teacher
                 })
 
-            lesson.is_one_time = False if lesson.repeat_weeks > 1 else True
+            #is teacher available?
+            if not is_slot_available(teacher, lesson.date, lesson.time, lesson.duration_minutes):
+                messages.error(request, "Selected time is unavailable. Please choose a green time slot.")
+                return render(request, 'book_lesson.html', {
+                    'form': form,
+                    'teacher': teacher
+                })
+
+            lesson.is_one_time = lesson.repeat_weeks <= 1
             lesson.save()
+
+            #is lessons cyclic?
             if lesson.repeat_weeks > 1:
                 for i in range(1, lesson.repeat_weeks):
                     LessonRequest.objects.create(
@@ -208,8 +211,8 @@ def book_lesson_view(request, teacher_id):
                         is_one_time=False,
                         status='pending'
                     )
-
-            return redirect('lesson_success')
+            messages.success(request, "Lesson successfully booked.")
+            return redirect('calendar')
         else:
             print("Form errors:", form.errors)
 
@@ -236,9 +239,9 @@ def lesson_calendar_json(request):
         if user.role == 'teacher':
             lessons = LessonRequest.objects.filter(teacher=user)
             availabilities = TeacherAvailability.objects.filter(teacher=user)
-        else:  # student
+        else:
             lessons = LessonRequest.objects.filter(student=user)
-            availabilities = []  # brak tła, bo student nie ma dostępności
+            availabilities = [] #student don't have availability
     events = []
 
     for lesson in lessons:
@@ -256,7 +259,6 @@ def lesson_calendar_json(request):
             'color': '#dc3545',
         })
 
-    from datetime import datetime, timedelta
     today = datetime.today()
     day_map = {
                 'mon': 0,
@@ -332,3 +334,47 @@ def teacher_availability_json(request):
                 })
 
     return JsonResponse(events, safe=False)
+
+def is_slot_available(teacher, date, time, duration_minutes):
+    day_map = {
+        0: 'mon', 1: 'tue', 2: 'wed',
+        3: 'thu', 4: 'fri', 5: 'sat', 6: 'sun'
+    }
+    weekday = date.weekday()
+    day_name = day_map[weekday]
+    
+    # teacher availability 
+    availabilities = TeacherAvailability.objects.filter(teacher=teacher, day=day_name)
+    if not availabilities.exists():
+        return False
+    
+    lesson_start = datetime.combine(date, time)
+    lesson_end = lesson_start + timedelta(minutes=duration_minutes)
+    
+    for availability in availabilities:
+        availability_start = datetime.combine(date, availability.start_time)
+        availability_end = datetime.combine(date, availability.end_time)
+        
+        # teacher have availability?
+        if lesson_start >= availability_start and lesson_end <= availability_end:
+            # colisions with another lessons
+            conflicting_lessons = LessonRequest.objects.filter(
+                teacher=teacher,
+                date=date,
+                status__in=['pending', 'accepted']
+            ).exclude(status='rejected')
+            
+            for lesson in conflicting_lessons:
+                lesson_start_time = datetime.combine(date, lesson.time)
+                lesson_end_time = lesson_start_time + timedelta(minutes=lesson.duration_minutes)
+                
+                if (lesson_start < lesson_end_time and lesson_end > lesson_start_time):
+                    return False
+            
+            return True
+    
+    return False
+
+
+def lesson_success(request):
+    return render(request, 'lesson_success.html')

@@ -1,8 +1,11 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2 class="text-2xl font-bold mb-4 px-32">Lesson Calendar</h2>
-<div id='calendar' class="max-w-5xl mx-auto"></div>
-
+<div class="px-32 py-8">
+<div class="mb-8 border-b border-gray-600">
+<p class="flex text-5xl font-bold mb-4 justify-center">My Lessons</p>
+</div>
+<div id='calendar'></div>
+</div>
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
 

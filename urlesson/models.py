@@ -52,8 +52,15 @@ class LessonRequest(models.Model):
     )
 
     DURATION_CHOICES = [
+        (30, '30 minutes'),
+        (35, '35 minutes'),
+        (40, '40 minutes'),
         (45, '45 minutes'),
+        (55, '55 minutes'),
         (60, '60 minutes'),
+        (75, '75 minutes'),
+        (90, '90 minutes'),
+        (120, '120 minutes'),
     ]
 
     date = models.DateField()

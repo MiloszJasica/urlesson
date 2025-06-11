@@ -1,14 +1,17 @@
 {% include "partials/head.html" %}
-<body class="flex flex-col min-h-screen">
+<body class="flex flex-col min-h-screen bg-gray-900 text-white font-serif">
+
   {% if messages %}
-    <div id="messages-container" class="fixed inset-0 flex mt-32 justify-center z-50 pointer-events-none">
-      <div class="space-y-4 text-center w-full max-w-sm">
-        {% for message in messages %}
-          <div class="bg-blue-500 text-white px-4 py-3 rounded shadow-lg pointer-events-auto">
-            {{ message }}
-          </div>
-        {% endfor %}
-      </div>
+    <div id="messages-container" class="fixed top-4 right-4 z-50 space-y-4 w-full max-w-sm pointer-events-none">
+      {% for message in messages %}
+        <div class="px-4 py-3 rounded shadow-lg text-white pointer-events-auto
+          {% if message.tags == 'error' %} bg-red-500
+          {% elif message.tags == 'success' %} bg-green-500
+          {% elif message.tags == 'warning' %} bg-yellow-500
+          {% else %} bg-blue-500 {% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
     </div>
   {% endif %}
 

@@ -23,30 +23,70 @@
 </div>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
+ document.addEventListener('DOMContentLoaded', function () {
     const calendarEl = document.getElementById('calendar');
     const calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'timeGridWeek',
-      allDaySlot: false,
-      selectable: true,
-      events: {
-        url: "{% url 'lesson_calendar_json' %}",
-        extraParams: { teacher_id: "{{ teacher.id }}" }
-      },
-      select: function(info) {
-        const start = new Date(info.start);
-        const date = start.toISOString().split("T")[0];
-        const time = start.toTimeString().split(" ")[0].slice(0,5);
+        initialView: 'timeGridWeek',
+        allDaySlot: false,
+        slotMinTime: '00:00:00',
+        slotMaxTime: '24:00:00',
+        events: {
+            url: "{% url 'lesson_calendar_json' %}",
+            extraParams: { teacher_id: "{{ teacher.id }}" }
+        },
+        dateClick: function(info) {
+        },
+        eventClick: function(info) {
+            if (info.event.display === 'background' && info.event.backgroundColor === '#28a745') {
+                const start = new Date(info.event.start);
+                const date = start.toISOString().split("T")[0];
+                const time = start.toTimeString().split(" ")[0].slice(0,5);
 
-        document.getElementById("selected-date").value = date;
-        document.getElementById("selected-time").value = time;
+                document.getElementById("selected-date").value = date;
+                document.getElementById("selected-time").value = time;
 
-        document.querySelector('input[name="date"]').value = date;
-        document.querySelector('input[name="time"]').value = time;
+                const dateInput = document.querySelector('input[name="date"]');
+                const timeInput = document.querySelector('input[name="time"]');
+                if (dateInput) dateInput.value = date;
+                if (timeInput) timeInput.value = time;
 
-        document.getElementById("booking-form").classList.remove("hidden");
-        document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
-      }
+                // Show form
+                document.getElementById("booking-form").classList.remove("hidden");
+                document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
+            } else {
+                alert("Cannot book a lesson in an unavailable time slot.");
+            }
+        },
+        selectable: true,
+        select: function(info) {
+            const start = new Date(info.start);
+            const end = new Date(info.end);
+            
+            const duration = (end - start) / (1000 * 60);
+            if (duration < 30) {
+                alert("Please select at least 30 minutes for a lesson.");
+                calendar.unselect();
+                return;
+            }
+
+            const date = start.toISOString().split("T")[0];
+            const time = start.toTimeString().split(" ")[0].slice(0,5);
+
+            // Automaticly fill date and time
+            document.getElementById("selected-date").value = date;
+            document.getElementById("selected-time").value = time;
+
+            const dateInput = document.querySelector('input[name="date"]');
+            const timeInput = document.querySelector('input[name="time"]');
+            if (dateInput) dateInput.value = date;
+            if (timeInput) timeInput.value = time;
+
+            // Show form
+            document.getElementById("booking-form").classList.remove("hidden");
+            document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
+
+            calendar.unselect();
+        }
     });
 
     calendar.render();
