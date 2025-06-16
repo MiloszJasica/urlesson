@@ -23,7 +23,7 @@ from .forms import (
 )
 
 def home(request):
-    return render(request, 'base.html')
+    return render(request, 'home.html')
 
 class CustomLoginView(LoginView):
     authentication_form = EmailAuthenticationForm
@@ -104,19 +104,26 @@ def profile_view(request):
 
 def user_list_view(request):
     role = request.GET.get('role')
-    users = CustomUser.objects.all()
+    if role is None:
+        if request.user.is_authenticated:
+            if request.user.role == 'student':
+                role = 'teacher'
+            elif request.user.role == 'teacher':
+                role = 'student'
+            else:
+                role = 'student'
+        else:
+            role = 'student'
 
+    users = CustomUser.objects.all()
     if request.user.is_authenticated:
         users = users.exclude(id=request.user.id)
-
     if role:
         users = users.filter(role=role)
-
     return render(request, 'user_list.html', {
         'object_list': users,
         'role': role,
     })
-
 
 
 @login_required
