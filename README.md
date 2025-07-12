@@ -28,3 +28,9 @@ python manage.py migrate
 ```bash
 python manage.py runserver
 ```
+
+6. Run Tailwind
+```bash
+.\venv\Scripts\activate          
+python manage.py tailwind start
+```
