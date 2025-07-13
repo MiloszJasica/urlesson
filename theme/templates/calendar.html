@@ -16,6 +16,7 @@
       initialView: 'timeGridWeek',
       allDaySlot: false,
       selectable: true,
+      height: 'auto',
       events: {
         url: "{% url 'lesson_calendar_json' %}",
         extraParams: { teacher_id: "{{ teacher.id }}" }

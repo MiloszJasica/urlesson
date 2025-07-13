@@ -13,13 +13,15 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import CustomUser, LessonRequest
 from .forms import LessonRequestForm
+from .models import Teacher, Student
+
 from .forms import (
     CustomUserCreationForm,
-    CustomUserExtraForm,
     EmailAuthenticationForm,
     LessonRequestForm,
     TeacherAvailabilityForm,
     TeacherPricingForm,
+    TeacherExtraForm, StudentExtraForm
 )
 
 def home(request):
@@ -37,25 +39,54 @@ def register_view(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            user = form.save(commit=False)
+            user.save() 
             login(request, user)
+            
+            request.session['user_id'] = user.id
+            request.session['role'] = user.role
+            
             return redirect('register_extra')
+        else:
+            print("Form errors:", form.errors)
     else:
         form = CustomUserCreationForm()
     return render(request, 'register.html', {'form': form})
 
 
 def register_extra_view(request):
-    user = request.user
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+
+    if not user_id or not role:
+        return redirect('register')
+
+    user = get_object_or_404(CustomUser, id=user_id)
+
+    if role == 'teacher':
+        ExtraFormClass = TeacherExtraForm
+        profile_model = Teacher
+    else:
+        ExtraFormClass = StudentExtraForm
+        profile_model = Student
+
     if request.method == 'POST':
-        form = CustomUserExtraForm(request.POST, instance=user)
+        form = ExtraFormClass(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Registered.")
+            profile = form.save(commit=False)
+            profile.user = user
+            profile.save()
+
+            del request.session['user_id']
+            del request.session['role']
+
             return redirect('profile')
     else:
-        form = CustomUserExtraForm(instance=user)
+        form = ExtraFormClass()
+
     return render(request, 'register_extra.html', {'form': form})
+
+
 
 @login_required
 def profile_view(request):
@@ -130,11 +161,11 @@ def user_list_view(request):
 def my_schedule_view(request):
     user = request.user
     if user.is_teacher():
-        lessons = LessonRequest.objects.filter(teacher=user, status='accepted')
+        lessons = LessonRequest.objects.filter(teacher=user.teacher_profile, status='accepted')
     else:
-        lessons = LessonRequest.objects.filter(student=user, status='accepted')
-    
+        lessons = LessonRequest.objects.filter(student=user.student_profile, status='accepted')
     return render(request, 'my_schedule.html', {'lessons': lessons})
+
 
 @login_required
 def edit_pricing_view(request):
@@ -142,16 +173,20 @@ def edit_pricing_view(request):
         messages.error(request, "You are not a teacher.")
         return redirect('profile')
 
+    teacher_profile = get_object_or_404(Teacher, user=request.user)
+
     if request.method == 'POST':
-        form = TeacherPricingForm(request.POST, instance=request.user)
+        form = TeacherPricingForm(request.POST, instance=teacher_profile)
         if form.is_valid():
             form.save()
-            messages.success(request, "Prices confirmed.")
+            messages.success(request, "Prices updated successfully.")
             return redirect('profile')
     else:
-        form = TeacherPricingForm(instance=request.user)
+        form = TeacherPricingForm(instance=teacher_profile)
 
     return render(request, 'teacher_pricing.html', {'form': form})
+
+
 
 @login_required
 def teacher_availability_view(request):
@@ -174,12 +209,13 @@ def teacher_availability_view(request):
 @login_required
 def book_lesson_view(request, teacher_id):
     teacher = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
+
     if request.method == 'POST':
         form = LessonRequestForm(request.POST)
         if form.is_valid():
             lesson = form.save(commit=False)
             lesson.student = request.user
-            lesson.teacher = teacher
+            lesson.teacher = teacher  # ✅ KLUCZOWE!
 
             try:
                 selected_date_str = request.POST.get('selected_date')
@@ -193,7 +229,6 @@ def book_lesson_view(request, teacher_id):
                     'teacher': teacher
                 })
 
-            #is teacher available?
             if not is_slot_available(teacher, lesson.date, lesson.time, lesson.duration_minutes):
                 messages.error(request, "Selected time is unavailable. Please choose a green time slot.")
                 return render(request, 'book_lesson.html', {
@@ -202,9 +237,9 @@ def book_lesson_view(request, teacher_id):
                 })
 
             lesson.is_one_time = lesson.repeat_weeks <= 1
-            lesson.save()
 
-            #is lessons cyclic?
+            lesson.save()  # <-- tu Django w `save()` spróbuje użyć teacher.teacher_profile
+
             if lesson.repeat_weeks > 1:
                 for i in range(1, lesson.repeat_weeks):
                     LessonRequest.objects.create(
@@ -218,11 +253,11 @@ def book_lesson_view(request, teacher_id):
                         is_one_time=False,
                         status='pending'
                     )
+
             messages.success(request, "Lesson successfully booked.")
             return redirect('calendar')
         else:
             print("Form errors:", form.errors)
-
     else:
         form = LessonRequestForm()
 
@@ -230,7 +265,6 @@ def book_lesson_view(request, teacher_id):
         'form': form,
         'teacher': teacher
     })
-
 
 
 @login_required

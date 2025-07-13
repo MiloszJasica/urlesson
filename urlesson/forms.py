@@ -10,32 +10,15 @@ from django import forms
 from .models import TeacherAvailability
 from django.db import models
 from django import forms
-from .models import TeacherAvailability
+from .models import Teacher, Student
 
 User = get_user_model()
 
 class CustomUserCreationForm(UserCreationForm):
     role = forms.ChoiceField(choices=CustomUser.ROLE_CHOICES)
-
-    class Meta:
-        model = CustomUser
-        fields = ('email', 'password1', 'password2', 'role')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.widget.attrs.update({
-                'class': 'w-full px-3 py-2 rounded text-black',
-            })
-
-class CustomUserExtraForm(forms.ModelForm):
     date_of_birth = forms.DateField(
         widget=DateInput(
-            attrs={
-                'type': 'date',
-                'class': 'w-full px-3 py-2 rounded bg-white text-black',
-                'placeholder': 'dd-mm-yyyy'
-            },
+            attrs={'type': 'date', 'class': 'w-full px-3 py-2 rounded bg-white text-black'},
             format='%Y-%m-%d',
         ),
         input_formats=['%Y-%m-%d', '%d-%m-%Y'],
@@ -44,14 +27,32 @@ class CustomUserExtraForm(forms.ModelForm):
 
     class Meta:
         model = CustomUser
-        fields = ('first_name', 'last_name', 'date_of_birth', 'can_commute', 'city')
+        fields = ('email', 'password1', 'password2', 'role', 'first_name', 'last_name', 'date_of_birth', 'can_commute', 'city', 'gender')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
-            field.widget.attrs.update({
-                'class': 'w-full px-3 py-2 rounded text-black',
-            })
+            field.widget.attrs.update({'class': 'w-full px-3 py-2 rounded text-black'})
+
+class TeacherExtraForm(forms.ModelForm):
+    class Meta:
+        model = Teacher
+        fields = ['price_per_minute_individual', 'price_per_minute_group', 'extra_student_group_minute_price', 'recurring_discount_percent']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({'class': 'w-full px-3 py-2 rounded text-black'})
+
+class StudentExtraForm(forms.ModelForm):
+    class Meta:
+        model = Student
+        fields = ['school', 'number_class']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({'class': 'w-full px-3 py-2 rounded text-black'})
             
 class EmailAuthenticationForm(AuthenticationForm):
     def clean_username(self):
@@ -93,7 +94,7 @@ class TeacherPricingForm(forms.ModelForm):
                 self.add_error(field, "Price must be greater than or equal to 0.")
 
     class Meta:
-        model = CustomUser
+        model = Teacher
         fields = [
             'price_per_minute_individual',
             'price_per_minute_group',

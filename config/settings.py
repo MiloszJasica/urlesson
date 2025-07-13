@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'theme',
     'django_browser_reload',
     'urlesson',
+    'django_tables2',
+    'django_filters',
 ]
 
 TAILWIND_APP_NAME = 'theme'

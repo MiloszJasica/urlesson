@@ -30,6 +30,7 @@
         allDaySlot: false,
         slotMinTime: '00:00:00',
         slotMaxTime: '24:00:00',
+        height: 'auto',
         events: {
             url: "{% url 'lesson_calendar_json' %}",
             extraParams: { teacher_id: "{{ teacher.id }}" }
