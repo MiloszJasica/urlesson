@@ -36,6 +36,7 @@ class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('student', 'Student'),
         ('teacher', 'Teacher'),
+        ('admin', 'Admin'),
     )
     GENDER_CHOICES = (
         ('male', 'Male'),

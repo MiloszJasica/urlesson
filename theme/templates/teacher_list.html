@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load render_table from django_tables2 %}
+
+{% block title %}List of users{% endblock %}
+
+{% block content %}
+  <div class="bg-gray-900 text-white py-16 px-32">
+    <div class="grid grid-cols-4 gap-6 py-16">
+  {% for user in object_list %}
+    <div class="border rounded-lg p-4 shadow-lg flex flex-col items-start w-full">
+      <div class="flex border-b w-full">
+  {% if user.profile_image.url %}
+    <img src="{{ user.profile_image.url }}" alt="{{ user.email }}" class="w-20 h-20 rounded-full mb-4 object-cover" />
+  {% else %}
+    <div class="w-20 h-20 rounded-full bg-gray-300 mb-4 flex items-center justify-center text-gray-600 bg-black"></div>
+  {% endif %}
+  <div class="ml-4 flex flex-col">
+    <p class="text-black text-sm text-center uppercase">
+      {% for subject in user.teacher_profile.subjects.all %}
+        <span class="mr-1 px-2 py-1 bg-gray-500">{{ subject.name }}</span>{% if not forloop.last %}, {% endif %}
+      {% empty %}
+        No subjects assigned.
+      {% endfor %}
+    </p>
+    <h3 class="font-bold text-3xl mt-2">{{ user.first_name }} {{ user.last_name }}</h3>
+  </div>
+</div>
+
+      <div class="flex border-b w-full">
+        {{ user.gender }}, {{ user.date_of_birth }}, {{ user.can_commute }}, {{ user.city }},   
+      </div>
+      <!-- <p class="text-gray-700">{{ user.email }}</p> -->
+        {% if user.role == 'teacher' %}
+        {% if request.user.is_authenticated %}
+          <a href="{% url 'book_lesson' user.id %}" class="mt-2 inline-block px-4 py-2 bg-green-600 text-white rounded w-full text-center">
+            Book lesson
+          </a>
+          <a href="#" class="mt-2 inline-block px-4 py-2 bg-blue-600 text-white rounded w-full text-center">
+            View details
+          </a>
+        {% else %}
+          <a href="{% url 'login' %}" class="mt-2 inline-block px-4 py-2 bg-blue-600 text-white rounded">
+            Log In for more options
+          </a>
+        {% endif %}
+      {% endif %}
+    </div>
+    
+  {% empty %}
+    <p>User list is empty.</p>
+  {% endfor %}
+
+</div>
+  </div>
+{% endblock %}

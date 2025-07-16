@@ -26,11 +26,12 @@ python manage.py migrate
 5. Run the Django development server:
 
 ```bash
+source venv/bin/activate
 python manage.py runserver
 ```
 
 6. Run Tailwind
 ```bash
-.\venv\Scripts\activate          
+source venv/bin/activate         
 python manage.py tailwind start
 ```

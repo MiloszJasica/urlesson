@@ -3,6 +3,29 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
 from .models import CustomUser, Teacher, Student, Subject, LessonRequest, TeacherAvailability
 
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from .models import CustomUser
+
+@admin.register(CustomUser)
+class CustomUserAdmin(BaseUserAdmin):
+    model = CustomUser
+    
+    list_display = ('email', 'role', 'is_staff', 'is_superuser')
+    list_filter = ('role', 'is_staff', 'is_superuser')
+    fieldsets = (
+        (None, {'fields': ('email', 'password', 'role')}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+    )
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('email', 'role', 'password1', 'password2', 'is_active', 'is_staff', 'is_superuser')}
+        ),
+    )
+    search_fields = ('email',)
+    ordering = ('email',)
+
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
     ordering = ('email',)

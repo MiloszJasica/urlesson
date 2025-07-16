@@ -133,27 +133,14 @@ def profile_view(request):
 
 
 
-def user_list_view(request):
-    role = request.GET.get('role')
-    if role is None:
-        if request.user.is_authenticated:
-            if request.user.role == 'student':
-                role = 'teacher'
-            elif request.user.role == 'teacher':
-                role = 'student'
-            else:
-                role = 'student'
-        else:
-            role = 'student'
+def teacher_list_view(request):
+    users = CustomUser.objects.filter(role='teacher').select_related('teacher_profile')
 
-    users = CustomUser.objects.all()
     if request.user.is_authenticated:
         users = users.exclude(id=request.user.id)
-    if role:
-        users = users.filter(role=role)
-    return render(request, 'user_list.html', {
+
+    return render(request, 'teacher_list.html', {
         'object_list': users,
-        'role': role,
     })
 
 
@@ -215,7 +202,7 @@ def book_lesson_view(request, teacher_id):
         if form.is_valid():
             lesson = form.save(commit=False)
             lesson.student = request.user
-            lesson.teacher = teacher  # ✅ KLUCZOWE!
+            lesson.teacher = teacher
 
             try:
                 selected_date_str = request.POST.get('selected_date')
@@ -238,7 +225,7 @@ def book_lesson_view(request, teacher_id):
 
             lesson.is_one_time = lesson.repeat_weeks <= 1
 
-            lesson.save()  # <-- tu Django w `save()` spróbuje użyć teacher.teacher_profile
+            lesson.save()
 
             if lesson.repeat_weeks > 1:
                 for i in range(1, lesson.repeat_weeks):
