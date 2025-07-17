@@ -109,8 +109,7 @@ class TeacherPricingForm(forms.ModelForm):
 class LessonRequestForm(forms.ModelForm):
     class Meta:
         model = LessonRequest
-        fields = ['date', 'duration_minutes', 'time', 'is_group', 'repeat_weeks']
-
+        fields = ['subject', 'date', 'duration_minutes', 'time', 'repeat_weeks']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'time': forms.TimeInput(attrs={'type': 'time'}),
@@ -118,12 +117,23 @@ class LessonRequestForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        teacher_user = kwargs.pop('teacher', None)
         super().__init__(*args, **kwargs)
+
         self.fields['repeat_weeks'].label = "Number of weekly lessons"
+
         for field in self.fields.values():
             field.widget.attrs.update({
                 'class': 'px-3 py-2 rounded text-black',
             })
+
+        if teacher_user:
+            try:
+                teacher_profile = Teacher.objects.get(user=teacher_user)
+                self.fields['subject'].queryset = teacher_profile.subjects.all()
+            except Teacher.DoesNotExist:
+                self.fields['subject'].queryset = Subject.objects.none()
+
 
 
 class TeacherAvailabilityForm(forms.ModelForm):

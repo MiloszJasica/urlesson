@@ -2,7 +2,6 @@
 {% block content %}
 <div class="px-32 py-8">
 <h2 class="text-xl font-bold mb-4">Book a Lesson with {{ teacher.get_full_name }}</h2>
-
 <div id="calendar" class="mb-8"></div>
 
 <div id="booking-form" class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -13,6 +12,7 @@
     {{ form.as_p }}
     <input type="hidden" name="selected_date" id="selected-date">
     <input type="hidden" name="selected_time" id="selected-time">
+    <p id="price-display" class="mt-4 text-xl text-white">Final Price: <span id="final-price">0.00</span> zł</p>
     <button type="submit" class="bg-yellow-500 hover:bg-green-500 text-black text-3xl px-4 py-2 border-black rounded mt-8">Book Lesson</button>
   </form>
 </div>
@@ -93,4 +93,23 @@
     calendar.render();
   });
 </script>
+<script>
+  const pricePerMinute = parseFloat("{{ price_individual }}");
+  const durationField = document.querySelector('#id_duration_minutes');
+  const finalPriceSpan = document.getElementById('final-price');
+
+  function calculatePrice() {
+    const duration = parseInt(durationField.value);
+    if (!isNaN(duration)) {
+      const price = pricePerMinute * duration;
+      finalPriceSpan.textContent = price.toFixed(2);
+    } else {
+      finalPriceSpan.textContent = "0.00";
+    }
+  }
+
+  durationField.addEventListener('change', calculatePrice);
+  window.addEventListener('DOMContentLoaded', calculatePrice);
+</script>
 {% endblock %}
+

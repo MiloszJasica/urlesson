@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'urlesson',
     'django_tables2',
     'django_filters',
+    'rest_framework',
+    'drf_yasg',
 ]
 
 TAILWIND_APP_NAME = 'theme'

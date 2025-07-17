@@ -967,8 +967,16 @@ select {
   margin-left: 0.5rem;
 }
 
+.ml-4 {
+  margin-left: 1rem;
+}
+
 .ml-8 {
   margin-left: 2rem;
+}
+
+.mr-1 {
+  margin-right: 0.25rem;
 }
 
 .mt-1 {
@@ -999,16 +1007,8 @@ select {
   margin-top: 2rem;
 }
 
-.ml-4 {
-  margin-left: 1rem;
-}
-
-.mr-2 {
-  margin-right: 0.5rem;
-}
-
-.mr-1 {
-  margin-right: 0.25rem;
+.mt-4 {
+  margin-top: 1rem;
 }
 
 .block {
@@ -1199,10 +1199,6 @@ select {
   justify-content: space-between;
 }
 
-.gap-2 {
-  gap: 0.5rem;
-}
-
 .gap-4 {
   gap: 1rem;
 }
@@ -1231,10 +1227,6 @@ select {
   --tw-space-y-reverse: 0;
   margin-top: calc(2rem * calc(1 - var(--tw-space-y-reverse)));
   margin-bottom: calc(2rem * var(--tw-space-y-reverse));
-}
-
-.overflow-hidden {
-  overflow: hidden;
 }
 
 .truncate {
@@ -1275,10 +1267,6 @@ select {
   border-bottom-width: 1px;
 }
 
-.border-b-8 {
-  border-bottom-width: 8px;
-}
-
 .border-t {
   border-top-width: 1px;
 }
@@ -1306,16 +1294,6 @@ select {
 .border-gray-800 {
   --tw-border-opacity: 1;
   border-color: rgb(31 41 55 / var(--tw-border-opacity, 1));
-}
-
-.border-red-600 {
-  --tw-border-opacity: 1;
-  border-color: rgb(220 38 38 / var(--tw-border-opacity, 1));
-}
-
-.border-yellow-500 {
-  --tw-border-opacity: 1;
-  border-color: rgb(234 179 8 / var(--tw-border-opacity, 1));
 }
 
 .bg-black {
@@ -1422,6 +1400,10 @@ select {
   padding: 2rem;
 }
 
+.p-2 {
+  padding: 0.5rem;
+}
+
 .px-12 {
   padding-left: 3rem;
   padding-right: 3rem;
@@ -1497,21 +1479,8 @@ select {
   padding-bottom: 2rem;
 }
 
-.px-1 {
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
-}
-
-.pb-2 {
-  padding-bottom: 0.5rem;
-}
-
 .pb-8 {
   padding-bottom: 2rem;
-}
-
-.pt-4 {
-  padding-top: 1rem;
 }
 
 .pt-6 {
@@ -1640,11 +1609,6 @@ select {
 .text-gray-200 {
   --tw-text-opacity: 1;
   color: rgb(229 231 235 / var(--tw-text-opacity, 1));
-}
-
-.text-gray-500 {
-  --tw-text-opacity: 1;
-  color: rgb(107 114 128 / var(--tw-text-opacity, 1));
 }
 
 .text-gray-600 {
@@ -1956,6 +1920,10 @@ select {
   top: bottom;
 }
 
+.\[tzname_offset\:nul\] {
+  tzname_offset: nul;
+}
+
 .\[upto\:next\] {
   upto: next;
 }
@@ -2011,11 +1979,6 @@ select {
 .hover\:text-black:hover {
   --tw-text-opacity: 1;
   color: rgb(0 0 0 / var(--tw-text-opacity, 1));
-}
-
-.hover\:text-gray-300:hover {
-  --tw-text-opacity: 1;
-  color: rgb(209 213 219 / var(--tw-text-opacity, 1));
 }
 
 .hover\:underline:hover {

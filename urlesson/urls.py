@@ -23,5 +23,4 @@ urlpatterns = [
     path('calendar/', views.calendar_view, name='calendar'),
     path('calendar/availability-json/', views.teacher_availability_json, name='teacher_availability_json'),
 
-
 ]

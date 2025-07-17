@@ -109,7 +109,13 @@ class LessonRequest(models.Model):
         (90, '90 minutes'),
         (120, '120 minutes'),
     ]
-
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lesson_requests'
+    )
     date = models.DateField()
     time = models.TimeField()
     duration_minutes = models.PositiveIntegerField(choices=DURATION_CHOICES, default=60)

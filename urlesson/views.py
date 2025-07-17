@@ -14,7 +14,8 @@ from django.contrib.auth.decorators import login_required
 from .models import CustomUser, LessonRequest
 from .forms import LessonRequestForm
 from .models import Teacher, Student
-
+from django.utils.timezone import datetime, timedelta
+from datetime import datetime, timedelta
 from .forms import (
     CustomUserCreationForm,
     EmailAuthenticationForm,
@@ -196,9 +197,12 @@ def teacher_availability_view(request):
 @login_required
 def book_lesson_view(request, teacher_id):
     teacher = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
+    teacher_profile = get_object_or_404(Teacher, user=teacher)
+    subject_list = teacher_profile.subjects.all()
 
     if request.method == 'POST':
-        form = LessonRequestForm(request.POST)
+        form = LessonRequestForm(request.POST, teacher=teacher)
+
         if form.is_valid():
             lesson = form.save(commit=False)
             lesson.student = request.user
@@ -213,18 +217,33 @@ def book_lesson_view(request, teacher_id):
                 form.add_error(None, "Invalid date or time format.")
                 return render(request, 'book_lesson.html', {
                     'form': form,
-                    'teacher': teacher
+                    'teacher': teacher,
+                    'subject_list': subject_list,
                 })
+
+            # przypisz subject po ID
+            subject_id = request.POST.get("subject")
+            if subject_id:
+                try:
+                    subject = subject_list.get(id=subject_id)
+                    lesson.subject = subject
+                except Subject.DoesNotExist:
+                    form.add_error(None, "Invalid subject.")
+                    return render(request, 'book_lesson.html', {
+                        'form': form,
+                        'teacher': teacher,
+                        'subject_list': subject_list,
+                    })
 
             if not is_slot_available(teacher, lesson.date, lesson.time, lesson.duration_minutes):
                 messages.error(request, "Selected time is unavailable. Please choose a green time slot.")
                 return render(request, 'book_lesson.html', {
                     'form': form,
-                    'teacher': teacher
+                    'teacher': teacher,
+                    'subject_list': subject_list,
                 })
 
             lesson.is_one_time = lesson.repeat_weeks <= 1
-
             lesson.save()
 
             if lesson.repeat_weeks > 1:
@@ -232,6 +251,7 @@ def book_lesson_view(request, teacher_id):
                     LessonRequest.objects.create(
                         student=lesson.student,
                         teacher=lesson.teacher,
+                        subject=lesson.subject,
                         date=lesson.date + timedelta(weeks=i),
                         time=lesson.time,
                         duration_minutes=lesson.duration_minutes,
@@ -243,33 +263,44 @@ def book_lesson_view(request, teacher_id):
 
             messages.success(request, "Lesson successfully booked.")
             return redirect('calendar')
-        else:
-            print("Form errors:", form.errors)
     else:
-        form = LessonRequestForm()
+        form = LessonRequestForm(teacher=teacher)
 
     return render(request, 'book_lesson.html', {
         'form': form,
-        'teacher': teacher
+        'teacher': teacher,
+        'subject_list': subject_list,
+        'price_individual': getattr(teacher.teacher_profile, 'price_per_minute_individual', 0),
     })
+
+
 
 
 @login_required
 def lesson_calendar_json(request):
     teacher_id = request.GET.get('teacher_id')
+    subject_list = []
 
     if teacher_id:
-        teacher = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
-        lessons = LessonRequest.objects.filter(teacher=teacher)
-        availabilities = TeacherAvailability.objects.filter(teacher=teacher)
+        teacher_user = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
+        teacher = get_object_or_404(Teacher, user=teacher_user)
+        lessons = LessonRequest.objects.filter(teacher=teacher_user)
+
+        availabilities = TeacherAvailability.objects.filter(teacher=teacher_user)
+
+        subject_list = [{'id': sub.id, 'name': sub.name} for sub in teacher.subjects.all()]
     else:
         user = request.user
         if user.role == 'teacher':
+            teacher = get_object_or_404(Teacher, user=user)
             lessons = LessonRequest.objects.filter(teacher=user)
             availabilities = TeacherAvailability.objects.filter(teacher=user)
+            subject_list = [{'id': sub.id, 'name': sub.name} for sub in teacher.subjects.all()]
         else:
             lessons = LessonRequest.objects.filter(student=user)
-            availabilities = [] #student don't have availability
+            availabilities = []
+            subject_list = []
+
     events = []
 
     for lesson in lessons:
@@ -280,23 +311,33 @@ def lesson_calendar_json(request):
             end_hour += 1
             end_min -= 60
         end_time = f"{lesson.date}T{end_hour:02}:{end_min:02}"
+
+        if request.user.role == 'student':
+            other_person = lesson.teacher
+        else:
+            other_person = lesson.student
+
+        full_name = f"{other_person.first_name} {other_person.last_name}".strip()
+        if not full_name.strip():
+            full_name = "No Name"
+
+        subject_name = lesson.subject.name if getattr(lesson, 'subject', None) else 'Lesson'
+        title = f"{subject_name} with {full_name}"
+
         events.append({
-            'title': f"Lesson",
+            'title': title,
             'start': start_time,
             'end': end_time,
             'color': '#dc3545',
         })
 
+
     today = datetime.today()
     day_map = {
-                'mon': 0,
-                'tue': 1,
-                'wed': 2,
-                'thu': 3,
-                'fri': 4,
-                'sat': 5,
-                'sun': 6,
-            }
+        'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3,
+        'fri': 4, 'sat': 5, 'sun': 6,
+    }
+
     for i in range(0, 366):
         current_day = today + timedelta(days=i)
         dow = current_day.weekday()
@@ -314,6 +355,7 @@ def lesson_calendar_json(request):
     return JsonResponse(events, safe=False)
 
 
+
 @login_required
 def calendar_view(request):
     teacher_id = request.GET.get("teacher_id")
@@ -329,11 +371,6 @@ def calendar_view(request):
         'teacher': teacher
     })
 
-
-
-from django.utils.timezone import datetime, timedelta
-
-from datetime import datetime, timedelta
 
 @login_required
 def teacher_availability_json(request):
