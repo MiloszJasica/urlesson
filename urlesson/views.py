@@ -16,78 +16,10 @@ from .forms import LessonRequestForm
 from .models import Teacher, Student
 from django.utils.timezone import datetime, timedelta
 from datetime import datetime, timedelta
-from .forms import (
-    CustomUserCreationForm,
-    EmailAuthenticationForm,
-    LessonRequestForm,
-    TeacherAvailabilityForm,
-    TeacherPricingForm,
-    TeacherExtraForm, StudentExtraForm
-)
+from .forms import TeacherAvailabilityForm
 
 def home(request):
     return render(request, 'home.html')
-
-class CustomLoginView(LoginView):
-    authentication_form = EmailAuthenticationForm
-    template_name = 'login.html'
-
-    def form_valid(self, form):
-        messages.success(self.request, "Logged In.")
-        return super().form_valid(form)
-
-def register_view(request):
-    if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.save() 
-            login(request, user)
-            
-            request.session['user_id'] = user.id
-            request.session['role'] = user.role
-            
-            return redirect('register_extra')
-        else:
-            print("Form errors:", form.errors)
-    else:
-        form = CustomUserCreationForm()
-    return render(request, 'register.html', {'form': form})
-
-
-def register_extra_view(request):
-    user_id = request.session.get('user_id')
-    role = request.session.get('role')
-
-    if not user_id or not role:
-        return redirect('register')
-
-    user = get_object_or_404(CustomUser, id=user_id)
-
-    if role == 'teacher':
-        ExtraFormClass = TeacherExtraForm
-        profile_model = Teacher
-    else:
-        ExtraFormClass = StudentExtraForm
-        profile_model = Student
-
-    if request.method == 'POST':
-        form = ExtraFormClass(request.POST)
-        if form.is_valid():
-            profile = form.save(commit=False)
-            profile.user = user
-            profile.save()
-
-            del request.session['user_id']
-            del request.session['role']
-
-            return redirect('profile')
-    else:
-        form = ExtraFormClass()
-
-    return render(request, 'register_extra.html', {'form': form})
-
-
 
 @login_required
 def profile_view(request):

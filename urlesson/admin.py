@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import CustomUser, Teacher, Student, Subject, LessonRequest, TeacherAvailability
+from .models import LessonRequest, TeacherAvailability
+from accounts.models import CustomUser, Teacher, Student, Subject
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
