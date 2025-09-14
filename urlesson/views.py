@@ -21,51 +21,6 @@ from .forms import TeacherAvailabilityForm
 def home(request):
     return render(request, 'home.html')
 
-@login_required
-def profile_view(request):
-    user = request.user
-    password_form = SetPasswordForm(request.user)
-    show_password_form = False 
-
-    editable_fields = [
-        ('Email', 'email'),
-        ('Role', 'get_role_display'),
-        ('Date of birth', 'date_of_birth'),
-        ('On-site visit', 'can_commute'),
-        ('City', 'city'),
-        ('Password', 'password'),
-    ]
-
-    if request.method == 'POST':
-        field = request.POST.get('field')
-        value = request.POST.get('value')
-
-        if field == 'password':
-            show_password_form = True 
-            form = SetPasswordForm(request.user, request.POST)
-            if form.is_valid():
-                form.save()
-                update_session_auth_hash(request, request.user)
-                messages.success(request, "Password changed successfully.")
-                return redirect('profile')
-            else:
-                password_form = form
-
-        elif field in ['email', 'first_name', 'last_name', 'date_of_birth', 'can_commute', 'city']:
-            setattr(user, field, value)
-            user.save()
-            messages.success(request, f'Changed field: {field}')
-            return redirect('profile')
-
-    return render(request, 'profile.html', {
-        'user': user,
-        'editable_fields': editable_fields,
-        'password_form': password_form,
-        'show_password_form': show_password_form,
-    })
-
-
-
 def teacher_list_view(request):
     users = CustomUser.objects.filter(role='teacher').select_related('teacher_profile')
 
@@ -76,22 +31,11 @@ def teacher_list_view(request):
         'object_list': users,
     })
 
-
-@login_required
-def my_schedule_view(request):
-    user = request.user
-    if user.is_teacher():
-        lessons = LessonRequest.objects.filter(teacher=user.teacher_profile, status='accepted')
-    else:
-        lessons = LessonRequest.objects.filter(student=user.student_profile, status='accepted')
-    return render(request, 'my_schedule.html', {'lessons': lessons})
-
-
 @login_required
 def edit_pricing_view(request):
     if not request.user.is_teacher():
         messages.error(request, "You are not a teacher.")
-        return redirect('profile')
+        return redirect('accounts:profile')
 
     teacher_profile = get_object_or_404(Teacher, user=request.user)
 
@@ -100,7 +44,7 @@ def edit_pricing_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Prices updated successfully.")
-            return redirect('profile')
+            return redirect('accounts:profile')
     else:
         form = TeacherPricingForm(instance=teacher_profile)
 
