@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="px-32 py-8">
+  <h2 class="text-2xl font-bold mb-6">{{ teacher.get_full_name }}</h2>
+
+  <div class="bg-gray-700 text-white p-6 rounded-lg shadow-lg w-[700px] mx-auto">
+    <form method="post" action="{% url 'confirm_lessons' teacher.id %}">
+      {% csrf_token %}
+      <input type="hidden" name="time" value="{{ lesson.time }}">
+      <input type="hidden" name="duration" value="{{ lesson.duration_minutes }}">
+      <input type="hidden" name="subject_id" value="{{ lesson.subject.id }}">
+
+      <!-- Summary -->
+      <div class="mb-6">
+        <h3 class="text-xl font-semibold mb-2">Summary</h3>
+        <p>Total lessons: {{ summary.total }}</p>
+        <p class="text-green-400">✅ To be saved: {{ summary.successful }}</p>
+        <p class="text-red-400">❌ Unavailable: {{ summary.failed }}</p>
+      </div>
+
+      <!-- Skipped lessons -->
+      {% if conflicts %}
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold mb-2 text-red-400">Unavailable lessons:</h3>
+        <ul class="list-disc pl-6">
+          {% for c in conflicts %}
+            <li>
+              <span class="font-medium">{{ c.original_date }}</span> at 
+              <span class="font-mono">{{ c.time }}</span>
+              – {{ c.status|capfirst }}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="flex justify-between mt-8">
+        <button type="submit" name="cancel"
+                class="bg-red-500 hover:bg-red-600 text-white text-xl px-6 py-3 rounded-lg shadow-md">
+          Cancel
+        </button>
+
+        <button type="submit" name="accept"
+                class="bg-yellow-500 hover:bg-green-500 text-black text-xl px-6 py-3 rounded-lg shadow-md">
+          Accept
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}

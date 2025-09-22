@@ -1,21 +1,35 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<h2>Your Weekly Availability</h2>
+<div class="px-32 py-8">
 
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Add Availability</button>
-</form>
+  <div class="bg-gray-700 text-white p-6 rounded-lg shadow-lg w-[700px] mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Your Weekly Availability</h2>
+    <form method="post">
+      {% csrf_token %}
 
-<hr>
+      <div class="mb-4">
+        {{ form.as_p }}
+      </div>
 
-<h3>Current Availability:</h3>
-  <ul>
-    {% for a in availabilities %}
-      <li>{{ a.get_day_display }}: {{ a.start_time }} - {{ a.end_time }}</li>
-    {% empty %}
-      <li>No availability set.</li>
-    {% endfor %}
-  </ul>
+      <button type="submit"
+              class="bg-yellow-500 hover:bg-green-500 text-black text-xl px-6 py-3 rounded-lg shadow-md">
+        Add Availability
+      </button>
+    </form>
+  </div>
+
+  <div class="bg-gray-800 text-white p-6 rounded-lg shadow-lg w-[700px] mx-auto mt-8">
+    <h3 class="text-xl font-semibold mb-4">Current Availability:</h3>
+      <ul class="list-disc pl-6">
+        {% for day, intervals in merged_availabilities.items %}
+          <p>{{ day|capfirst }}:
+            {% for start, end in intervals %}
+              {{ start|time:"H:i" }} - {{ end|time:"H:i" }}{% if not forloop.last %} and {% endif %}
+            {% endfor %}
+          </p>
+        {% endfor %}
+      </ul>
+
+  </div>
+</div>
 {% endblock %}

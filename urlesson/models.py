@@ -100,7 +100,7 @@ class TeacherAvailability(models.Model):
     end_time = models.TimeField()
 
     class Meta:
-        unique_together = ('teacher', 'day')
+        #unique_together = ('teacher', 'day')
         ordering = ['day', 'start_time']
 
     def __str__(self):

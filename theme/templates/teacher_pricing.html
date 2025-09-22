@@ -16,30 +16,11 @@
     {{ form.price_per_minute_individual.errors }}
   </div>
 
-  <div class="mb-4">
-    <label for="{{ form.price_per_minute_group.id_for_label }}" class="block mb-1 font-semibold text-black">
-      Price per minute (group base):
-    </label>
-    {{ form.price_per_minute_group|add_class:"bg-white text-black border border-gray-300 rounded px-3 py-2 w-full" }}
-    {{ form.price_per_minute_group.errors }}
-  </div>
-
-  <div class="mb-6">
-    <label for="{{ form.extra_student_group_minute_price.id_for_label }}" class="block mb-1 font-semibold text-black">
-      Extra per minute per additional student (group):
-    </label>
-    {{ form.extra_student_group_minute_price|add_class:"bg-white text-black border border-gray-300 rounded px-3 py-2 w-full" }}
-    {{ form.extra_student_group_minute_price.errors }}
-  </div>
-
   <hr class="my-6">
 
   <h2 class="text-xl font-semibold mb-4">Earnings Preview</h2>
   <p class="mb-2 text-black">Individual lesson 45 min: <strong><span id="earnings-45min">0.00</span> USD</strong></p>
   <p class="mb-2 text-black">Individual lesson 60 min: <strong><span id="earnings-60min">0.00</span> USD</strong></p>
-  <p class="mb-2 text-black">Group lesson 45 min (2 students): <strong><span id="earnings-group-2">0.00</span> USD</strong></p>
-  <p class="mb-2 text-black">Group lesson 45 min (3 students): <strong><span id="earnings-group-3">0.00</span> USD</strong></p>
-  <p class="mb-6 text-black">Group lesson 45 min (4 students): <strong><span id="earnings-group-4">0.00</span> USD</strong></p>
 
   <button type="submit" 
           class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded w-full transition">

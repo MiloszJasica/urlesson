@@ -96,7 +96,20 @@ class LessonRequestForm(forms.ModelForm):
 
 
 
+from django import forms
+
 class TeacherAvailabilityForm(forms.ModelForm):
     class Meta:
         model = TeacherAvailability
         fields = ['day', 'start_time', 'end_time']
+        widgets = {
+            'start_time': forms.TimeInput(attrs={'type': 'time'}),
+            'end_time': forms.TimeInput(attrs={'type': 'time'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            field.widget.attrs.update({
+                'class': 'px-3 py-2 rounded text-black bg-white placeholder-gray-400'
+            })

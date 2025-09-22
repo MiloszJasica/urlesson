@@ -17,6 +17,8 @@ from .models import Teacher, Student
 from django.utils.timezone import datetime, timedelta
 from datetime import datetime, timedelta
 from .forms import TeacherAvailabilityForm
+from .forms import TeacherPricingForm
+from collections import defaultdict
 
 def home(request):
     return render(request, 'home.html')
@@ -31,26 +33,34 @@ def teacher_list_view(request):
         'object_list': users,
     })
 
-@login_required
-def edit_pricing_view(request):
-    if not request.user.is_teacher():
-        messages.error(request, "You are not a teacher.")
-        return redirect('accounts:profile')
+#TEACHER AVAILABILITY
+def merge_availabilities(availabilities):
+    if not availabilities:
+        return []
 
-    teacher_profile = get_object_or_404(Teacher, user=request.user)
+    sorted_avails = sorted(availabilities, key=lambda a: a.start_time)
+    merged = [(sorted_avails[0].start_time, sorted_avails[0].end_time)]
 
-    if request.method == 'POST':
-        form = TeacherPricingForm(request.POST, instance=teacher_profile)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Prices updated successfully.")
-            return redirect('accounts:profile')
-    else:
-        form = TeacherPricingForm(instance=teacher_profile)
+    for a in sorted_avails[1:]:
+        last_start, last_end = merged[-1]
+        if a.start_time <= last_end:  # overlapping or contiguous
+            merged[-1] = (last_start, max(last_end, a.end_time))
+        else:
+            merged.append((a.start_time, a.end_time))
 
-    return render(request, 'teacher_pricing.html', {'form': form})
+    return merged
 
+def get_merged_availabilities(teacher):
+    day_avails = defaultdict(list)
 
+    for avail in teacher.availabilities.all():
+        day_avails[avail.day].append(avail)
+
+    merged = {}
+    for day, avails in day_avails.items():
+        merged[day] = merge_availabilities(avails)
+
+    return merged
 
 @login_required
 def teacher_availability_view(request):
@@ -64,11 +74,42 @@ def teacher_availability_view(request):
     else:
         form = TeacherAvailabilityForm()
 
-    availabilities = TeacherAvailability.objects.filter(teacher=request.user)
+    merged_availabilities = get_merged_availabilities(request.user)
+
     return render(request, 'availability.html', {
         'form': form,
-        'availabilities': availabilities
+        'merged_availabilities': merged_availabilities,
     })
+
+
+#BOOK LESSON
+def find_alternative_slots(teacher, date, time, duration_minutes, max_weeks=12, max_suggestions=3):
+    suggestions = []
+
+    for week in range(max_weeks):
+        new_date = date + timedelta(weeks=week)
+        if is_slot_available(teacher, new_date, time, duration_minutes):
+            suggestions.append(new_date)
+            break
+
+    for days in range(1, 7):
+        new_date = date + timedelta(days=days)
+        if is_slot_available(teacher, new_date, time, duration_minutes):
+            suggestions.append(new_date)
+            break
+
+    last_lesson = LessonRequest.objects.filter(teacher=teacher).order_by('-date', '-time').first()
+    if last_lesson:
+        check_date = last_lesson.date + timedelta(days=1)
+        for week in range(max_weeks):
+            new_date = check_date + timedelta(weeks=week)
+            if is_slot_available(teacher, new_date, time, duration_minutes):
+                suggestions.append(new_date)
+                break
+
+    return suggestions[:max_suggestions]
+
+
 
 @login_required
 def book_lesson_view(request, teacher_id):
@@ -97,7 +138,6 @@ def book_lesson_view(request, teacher_id):
                     'subject_list': subject_list,
                 })
 
-            # przypisz subject po ID
             subject_id = request.POST.get("subject")
             if subject_id:
                 try:
@@ -120,25 +160,58 @@ def book_lesson_view(request, teacher_id):
                 })
 
             lesson.is_one_time = lesson.repeat_weeks <= 1
-            lesson.save()
+            request.session['pending_lesson'] = {
+                'teacher_id': teacher.id,
+                'student_id': request.user.id,
+                'date': str(lesson.date),
+                'time': str(lesson.time),
+                'duration_minutes': lesson.duration_minutes,
+                'subject_id': lesson.subject.id if lesson.subject else None,
+                'repeat_weeks': lesson.repeat_weeks,
+            }
+            request.session.modified = True
+
+            conflicts = []
+            proposals = []
 
             if lesson.repeat_weeks > 1:
-                for i in range(1, lesson.repeat_weeks):
-                    LessonRequest.objects.create(
-                        student=lesson.student,
-                        teacher=lesson.teacher,
-                        subject=lesson.subject,
-                        date=lesson.date + timedelta(weeks=i),
-                        time=lesson.time,
-                        duration_minutes=lesson.duration_minutes,
-                        is_group=lesson.is_group,
-                        repeat_weeks=1,
-                        is_one_time=False,
-                        status='pending'
-                    )
+                successful = 1
+                failed = 0
+                conflicts = []
+                proposals = []
 
-            messages.success(request, "Lesson successfully booked.")
-            return redirect('calendar')
+                for i in range(1, lesson.repeat_weeks):
+                    next_date = lesson.date + timedelta(weeks=i)
+
+                    if is_slot_available(teacher, next_date, lesson.time, lesson.duration_minutes):
+                        proposals.append({
+                            "date": next_date,
+                            "time": lesson.time,
+                            "status": "free"
+                        })
+                        successful += 1
+                    else:
+                        conflicts.append({
+                            "original_date": next_date,
+                            "time": lesson.time,
+                            "status": "conflict"
+                        })
+                        failed += 1
+
+                return render(request, 'confirm_lesson.html', {
+                    'lesson': lesson,
+                    'conflicts': conflicts,
+                    'proposals': proposals,
+                    'teacher': teacher,
+                    'summary': {
+                        'successful': successful,
+                        'failed': failed,
+                        'total': lesson.repeat_weeks,
+                    }
+                })
+            else:
+                messages.success(request, "Lesson(s) successfully booked!")
+                return redirect('calendar')
     else:
         form = LessonRequestForm(teacher=teacher)
 
@@ -149,6 +222,42 @@ def book_lesson_view(request, teacher_id):
         'price_individual': getattr(teacher.teacher_profile, 'price_per_minute_individual', 0),
     })
 
+from datetime import datetime as dt, time as dt_time, date as dt_date
+
+@login_required
+def confirm_lessons_view(request, teacher_id):
+    if request.method == "POST":
+        pending_lesson = request.session.get('pending_lesson')
+        if not pending_lesson:
+            messages.error(request, "No pending lesson data found.")
+            return redirect("teacher_list")
+
+        teacher = get_object_or_404(CustomUser, id=pending_lesson['teacher_id'], role='teacher')
+
+        if "accept" in request.POST:
+            lesson_date = dt.strptime(pending_lesson['date'], "%Y-%m-%d").date()
+            lesson_time = dt.strptime(pending_lesson['time'], "%H:%M:%S").time() \
+                if ":" in pending_lesson['time'] else dt.strptime(pending_lesson['time'], "%H:%M").time()
+
+            LessonRequest.objects.create(
+                student=request.user,
+                teacher=teacher,
+                date=lesson_date,
+                time=lesson_time,
+                duration_minutes=pending_lesson['duration_minutes'],
+                subject_id=pending_lesson['subject_id'],
+                status="pending",
+            )
+            messages.success(request, "Lesson confirmed and saved successfully!")
+            del request.session['pending_lesson']
+            return redirect("calendar")
+
+        elif "cancel" in request.POST:
+            messages.info(request, "Lesson request was canceled.")
+            del request.session['pending_lesson']
+            return redirect("book_lesson", teacher_id=teacher.id)
+
+    return redirect("teacher_list")
 
 
 
@@ -229,24 +338,6 @@ def lesson_calendar_json(request):
                 })
 
     return JsonResponse(events, safe=False)
-
-
-
-@login_required
-def calendar_view(request):
-    teacher_id = request.GET.get("teacher_id")
-
-    if teacher_id:
-        teacher = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
-    elif request.user.role == 'teacher':
-        teacher = request.user
-    else:
-        teacher = None
-
-    return render(request, 'calendar.html', {
-        'teacher': teacher
-    })
-
 
 @login_required
 def teacher_availability_json(request):

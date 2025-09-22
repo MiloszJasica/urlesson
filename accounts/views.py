@@ -61,7 +61,7 @@ def register_extra_view(request):
 
     return render(request, 'accounts/register_extra.html', {'form': form})
 
-#PROFILE AND SCHEDULE VIEWS
+#PROFILE, SCHEDULE VIEWS, AND EDITING
 
 @login_required
 def profile_view(request):
@@ -105,3 +105,38 @@ def profile_view(request):
         'password_form': password_form,
         'show_password_form': show_password_form,
     })
+
+@login_required
+def edit_pricing_view(request):
+    if not request.user.is_teacher():
+        messages.error(request, "You are not a teacher.")
+        return redirect('accounts:profile')
+
+    teacher_profile = get_object_or_404(Teacher, user=request.user)
+
+    if request.method == 'POST':
+        form = TeacherPricingForm(request.POST, instance=teacher_profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Prices updated successfully.")
+            return redirect('accounts:profile')
+    else:
+        form = TeacherPricingForm(instance=teacher_profile)
+
+    return render(request, 'teacher_pricing.html', {'form': form})
+
+@login_required
+def calendar_view(request):
+    teacher_id = request.GET.get("teacher_id")
+
+    if teacher_id:
+        teacher = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
+    elif request.user.role == 'teacher':
+        teacher = request.user
+    else:
+        teacher = None
+
+    return render(request, 'calendar.html', {
+        'teacher': teacher
+    })
+
