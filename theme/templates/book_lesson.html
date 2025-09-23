@@ -38,26 +38,25 @@
         dateClick: function(info) {
         },
         eventClick: function(info) {
-            if (info.event.display === 'background' && info.event.backgroundColor === '#28a745') {
-                const start = new Date(info.event.start);
-                const date = start.toISOString().split("T")[0];
-                const time = start.toTimeString().split(" ")[0].slice(0,5);
+          const type = info.event.extendedProps.type;
 
-                document.getElementById("selected-date").value = date;
-                document.getElementById("selected-time").value = time;
+          if (type === 'availability') {
+              const start = new Date(info.event.start);
+              const date = start.toISOString().split("T")[0];
+              const time = start.toTimeString().split(" ")[0].slice(0,5);
 
-                const dateInput = document.querySelector('input[name="date"]');
-                const timeInput = document.querySelector('input[name="time"]');
-                if (dateInput) dateInput.value = date;
-                if (timeInput) timeInput.value = time;
+              document.getElementById("selected-date").value = date;
+              document.getElementById("selected-time").value = time;
 
-                // Show form
-                document.getElementById("booking-form").classList.remove("hidden");
-                document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
-            } else {
-                alert("Cannot book a lesson in an unavailable time slot.");
-            }
-        },
+              document.getElementById("booking-form").classList.remove("hidden");
+              document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
+
+          } else if (type === 'lesson') {
+              alert("This slot is already booked.");
+          } else if (type === 'blocked') {
+              alert("Teacher is busy at this time.");
+          }
+      },
         selectable: true,
         select: function(info) {
             const start = new Date(info.start);
@@ -87,7 +86,11 @@
             document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
 
             calendar.unselect();
-        }
+        },
+        eventOverlap: function(stillEvent, movingEvent) {
+            return stillEvent.display === 'auto' && movingEvent.display === 'background';
+        },
+
     });
 
     calendar.render();

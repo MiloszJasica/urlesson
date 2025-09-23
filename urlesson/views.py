@@ -53,12 +53,37 @@ def merge_availabilities(availabilities):
 def get_merged_availabilities(teacher):
     day_avails = defaultdict(list)
 
+    # zbieramy dostępności
     for avail in teacher.availabilities.all():
         day_avails[avail.day].append(avail)
 
+    # zbieramy lekcje
+    lessons = LessonRequest.objects.filter(
+        teacher=teacher,
+        status__in=['pending', 'accepted']
+    )
+
     merged = {}
     for day, avails in day_avails.items():
-        merged[day] = merge_availabilities(avails)
+        merged_avail = merge_availabilities(avails)
+        available_slots = []
+
+        for start, end in merged_avail:
+            slot_start = start
+            for lesson in lessons:
+                if lesson.date.weekday() != ['mon','tue','wed','thu','fri','sat','sun'].index(day):
+                    continue
+                lesson_start = lesson.time
+                lesson_end = (datetime.combine(datetime.today(), lesson.time) + timedelta(minutes=lesson.duration_minutes)).time()
+
+                if lesson_start < end and lesson_end > slot_start:
+                    if slot_start < lesson_start:
+                        available_slots.append((slot_start, lesson_start))
+                    slot_start = max(slot_start, lesson_end)
+            if slot_start < end:
+                available_slots.append((slot_start, end))
+
+        merged[day] = available_slots
 
     return merged
 
@@ -210,6 +235,8 @@ def book_lesson_view(request, teacher_id):
                     }
                 })
             else:
+                lesson.status = "pending"
+                lesson.save()
                 messages.success(request, "Lesson(s) successfully booked!")
                 return redirect('calendar')
     else:
@@ -264,80 +291,76 @@ def confirm_lessons_view(request, teacher_id):
 @login_required
 def lesson_calendar_json(request):
     teacher_id = request.GET.get('teacher_id')
-    subject_list = []
+    events = []
 
     if teacher_id:
         teacher_user = get_object_or_404(CustomUser, id=teacher_id, role='teacher')
-        teacher = get_object_or_404(Teacher, user=teacher_user)
-        lessons = LessonRequest.objects.filter(teacher=teacher_user)
-
-        availabilities = TeacherAvailability.objects.filter(teacher=teacher_user)
-
-        subject_list = [{'id': sub.id, 'name': sub.name} for sub in teacher.subjects.all()]
     else:
-        user = request.user
-        if user.role == 'teacher':
-            teacher = get_object_or_404(Teacher, user=user)
-            lessons = LessonRequest.objects.filter(teacher=user)
-            availabilities = TeacherAvailability.objects.filter(teacher=user)
-            subject_list = [{'id': sub.id, 'name': sub.name} for sub in teacher.subjects.all()]
-        else:
-            lessons = LessonRequest.objects.filter(student=user)
-            availabilities = []
-            subject_list = []
+        teacher_user = request.user if request.user.role == 'teacher' else None
 
-    events = []
+    if teacher_user:
+        lessons = LessonRequest.objects.filter(
+            teacher=teacher_user,
+            status__in=['pending', 'accepted']
+        )
+        merged_availabilities = get_merged_availabilities(teacher_user)
+    else:  # student view
+        lessons = LessonRequest.objects.filter(
+            student=request.user,
+            status__in=['pending', 'accepted']
+        )
+        merged_availabilities = {}
 
+    # Dodajemy lekcje (czerwone / blokady)
     for lesson in lessons:
-        start_time = f"{lesson.date}T{lesson.time}"
-        end_hour = lesson.time.hour + lesson.duration_minutes // 60
-        end_min = lesson.time.minute + lesson.duration_minutes % 60
-        if end_min >= 60:
-            end_hour += 1
-            end_min -= 60
-        end_time = f"{lesson.date}T{end_hour:02}:{end_min:02}"
+        start_dt = datetime.combine(lesson.date, lesson.time)
+        end_dt = start_dt + timedelta(minutes=lesson.duration_minutes)
 
-        if request.user.role == 'student':
-            other_person = lesson.teacher
+        if request.user.role == 'student' and lesson.student != request.user:
+            events.append({
+                'start': start_dt.isoformat(),
+                'end': end_dt.isoformat(),
+                'display': 'background',
+                'color': 'rgba(255, 204, 204, 0)',
+                'type': 'blocked'
+            })
         else:
-            other_person = lesson.student
+            subject_name = lesson.subject.name if lesson.subject else "Lesson"
+            other_person = lesson.teacher if request.user.role == 'student' else lesson.student
+            full_name = f"{other_person.first_name} {other_person.last_name}".strip() or "No Name"
 
-        full_name = f"{other_person.first_name} {other_person.last_name}".strip()
-        if not full_name.strip():
-            full_name = "No Name"
+            events.append({
+                'title': f"{subject_name} with {full_name}",
+                'start': start_dt.isoformat(),
+                'end': end_dt.isoformat(),
+                'color': '#dc3545',
+                'type': 'lesson'
+            })
 
-        subject_name = lesson.subject.name if getattr(lesson, 'subject', None) else 'Lesson'
-        title = f"{subject_name} with {full_name}"
-
-        events.append({
-            'title': title,
-            'start': start_time,
-            'end': end_time,
-            'color': '#dc3545',
-        })
-
-
+    # Dodajemy dostępności (zielone tylko w wolnych slotach)
     today = datetime.today()
-    day_map = {
-        'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3,
-        'fri': 4, 'sat': 5, 'sun': 6,
-    }
+    day_names = ['mon','tue','wed','thu','fri','sat','sun']
 
     for i in range(0, 366):
         current_day = today + timedelta(days=i)
         dow = current_day.weekday()
-        for avail in availabilities:
-            if day_map[avail.day] == dow:
-                start_dt = datetime.combine(current_day.date(), avail.start_time)
-                end_dt = datetime.combine(current_day.date(), avail.end_time)
+        day_name = day_names[dow]
+
+        if day_name in merged_availabilities:
+            for start_time, end_time in merged_availabilities[day_name]:
+                start_dt = datetime.combine(current_day.date(), start_time)
+                end_dt = datetime.combine(current_day.date(), end_time)
                 events.append({
                     'start': start_dt.isoformat(),
                     'end': end_dt.isoformat(),
                     'display': 'background',
-                    'color': '#28a745'
+                    'color': '#28a745',
+                    'type': 'availability'
                 })
 
     return JsonResponse(events, safe=False)
+
+
 
 @login_required
 def teacher_availability_json(request):
