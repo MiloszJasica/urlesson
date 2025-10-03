@@ -1,42 +1,108 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="px-32 py-8">
-<div class="mb-8 border-b border-gray-600">
-<p class="flex text-5xl font-bold mb-4 justify-center">My Lessons</p>
+  <div class="mb-8 border-b border-gray-600">
+    <p class="flex text-5xl font-bold mb-4 justify-center">My Lessons & Availability</p>
+  </div>
+  <div class="flex grid-cols-2 gap-32">
+    <div>
+      <h2 class="text-xl font-bold mt-8 mb-2">Add recurring availability</h2>
+      <form method="post" class="mb-6">
+        {% csrf_token %}
+        {{ recurring_form.as_p }}
+        <div class="py-2"></div>
+        <button type="submit" name="add_recurring" class="px-4 py-2 bg-green-600 text-white rounded-lg">
+          Add availability
+        </button>
+      </form>
+      {% if recurring_form.errors %}
+      <div class="text-red-600">
+        {{ recurring_form.errors }}
+      </div>
+      {% endif %}
+    </div>
+    <div id='calendar'></div>
+  </div>
 </div>
-<div id='calendar'></div>
-</div>
+
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const calendarEl = document.getElementById('calendar');
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'timeGridWeek',
-      allDaySlot: false,
-      selectable: true,
-      height: 'auto',
-      events: {
-        url: "{% url 'lesson_calendar_json' %}",
-        extraParams: { teacher_id: "{{ teacher.id }}" }
-      },
-      select: function(info) {
-        const start = new Date(info.start);
-        const date = start.toISOString().split("T")[0];
-        const time = start.toTimeString().split(" ")[0].slice(0,5);
+const csrftoken = "{{ csrf_token }}";
 
-        document.getElementById("selected-date").value = date;
-        document.getElementById("selected-time").value = time;
-
-        document.getElementById("booking-form").classList.remove("hidden");
-        document.getElementById("booking-form").scrollIntoView({ behavior: "smooth" });
+document.addEventListener('DOMContentLoaded', function () {
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'timeGridWeek',
+    allDaySlot: false,
+    selectable: true,
+    height: 'auto',
+    scrollTime: '08:00:00',
+    timeZone: 'UTC',  // <-- ważne!
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    events: function(fetchInfo, successCallback, failureCallback) {
+      fetch("{% url 'teacher_availability_json' %}?teacher_id={{ teacher.id }}")
+        .then(res => res.json())
+        .then(avails => {
+          fetch("{% url 'lesson_calendar_json' %}?teacher_id={{ teacher.id }}")
+            .then(res => res.json())
+            .then(lessons => {
+              avails.forEach(a => a.id = a.id || Math.random());
+              lessons.forEach(l => l.id = l.id || Math.random());
+              successCallback([...avails, ...lessons]);
+            });
+        });
+    },
+    select: function(info) {
+      fetch("{% url 'add_availability' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrftoken
+        },
+        body: JSON.stringify({
+          start: info.start.toISOString(),  // wysyłamy UTC
+          end: info.end.toISOString(),
+          teacher_id: "{{ teacher.id }}"
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.success) {
+          calendar.refetchEvents();
+        } else {
+          alert("Could not add availability.");
+        }
+      });
+    },
+    eventClick: function(info) {
+      if (info.event.extendedProps.type === "availability") {
+        if (confirm("Delete this availability?")) {
+          fetch("{% url 'delete_availability' %}", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrftoken
+            },
+            body: JSON.stringify({ id: info.event.id })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              info.event.remove();
+            }
+          });
+        }
       }
-    });
-
-    calendar.render();
+    }
   });
+
+  calendar.render();
+});
 </script>
-
-
 {% endblock %}

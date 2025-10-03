@@ -77,26 +77,21 @@ class LessonRequest(models.Model):
 
         super().save(*args, **kwargs)
 
-
-class TeacherAvailability(models.Model):
-    DAYS_OF_WEEK = [
-        ('mon', 'Monday'),
-        ('tue', 'Tuesday'),
-        ('wed', 'Wednesday'),
-        ('thu', 'Thursday'),
-        ('fri', 'Friday'),
-        ('sat', 'Saturday'),
-        ('sun', 'Sunday'),
-    ]
-
-    teacher = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='availabilities')
-    day = models.CharField(max_length=3, choices=DAYS_OF_WEEK)
-    start_time = models.TimeField()
-    end_time = models.TimeField()
+class TeacherDayOff(models.Model):
+    teacher = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="days_off")
+    date = models.DateField()
 
     class Meta:
-        #unique_together = ('teacher', 'day')
-        ordering = ['day', 'start_time']
+        unique_together = ('teacher', 'date')
+        ordering = ['date']
 
     def __str__(self):
-        return f"{self.get_day_display()}: {self.start_time.strftime('%H:%M')} - {self.end_time.strftime('%H:%M')}"
+        return f"{self.teacher} - day off {self.date}"
+
+class TeacherAvailabilityPeriod(models.Model):
+    teacher = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="availability_periods")
+    start_datetime = models.DateTimeField()
+    end_datetime = models.DateTimeField()
+
+    def __str__(self):
+        return f"{self.teacher.email} | {self.start_datetime} - {self.end_datetime}"

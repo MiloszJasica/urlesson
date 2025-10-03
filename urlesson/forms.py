@@ -7,10 +7,11 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import SetPasswordForm
 from django import forms
-from .models import TeacherAvailability
+from .models import TeacherDayOff, LessonRequest
 from django.db import models
 from django import forms
 from accounts.models import Teacher, Student
+from .models import TeacherAvailabilityPeriod
 
 User = get_user_model()
             
@@ -94,22 +95,41 @@ class LessonRequestForm(forms.ModelForm):
             except Teacher.DoesNotExist:
                 self.fields['subject'].queryset = Subject.objects.none()
 
-
-
-from django import forms
-
-class TeacherAvailabilityForm(forms.ModelForm):
+class TeacherDayOffForm(forms.ModelForm):
     class Meta:
-        model = TeacherAvailability
-        fields = ['day', 'start_time', 'end_time']
+        model = TeacherDayOff
+        fields = ['date']
         widgets = {
-            'start_time': forms.TimeInput(attrs={'type': 'time'}),
-            'end_time': forms.TimeInput(attrs={'type': 'time'}),
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'px-3 py-2 rounded text-black bg-white'}),
+        }
+ 
+class TeacherAvailabilityPeriodForm(forms.ModelForm):
+    class Meta:
+        model = TeacherAvailabilityPeriod
+        fields = ['start_datetime', 'end_datetime']
+        widgets = {
+            'start_datetime': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'end_datetime': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            field.widget.attrs.update({
-                'class': 'px-3 py-2 rounded text-black bg-white placeholder-gray-400'
-            })
+
+class RecurringAvailabilityForm(forms.Form):
+    DAYS_OF_WEEK = [
+        (0, 'Monday'),
+        (1, 'Tuesday'),
+        (2, 'Wednesday'),
+        (3, 'Thursday'),
+        (4, 'Friday'),
+        (5, 'Saturday'),
+        (6, 'Sunday'),
+    ]
+
+    days_of_week = forms.MultipleChoiceField(
+        choices=DAYS_OF_WEEK,
+        widget=forms.CheckboxSelectMultiple,
+        label="Days of the week"
+    )
+    start_time = forms.TimeField(widget=forms.TimeInput(format='%H:%M', attrs={'class': 'px-3 py-2 rounded text-black bg-white'}))
+    end_time = forms.TimeField(widget=forms.TimeInput(format='%H:%M', attrs={'class': 'px-3 py-2 rounded text-black bg-white'}))
+    start_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'class': 'px-3 py-2 rounded text-black bg-white'}))
+    end_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'class': 'px-3 py-2 rounded text-black bg-white'}))

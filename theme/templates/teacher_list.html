@@ -15,7 +15,7 @@
     <div class="w-20 h-20 rounded-full bg-gray-300 mb-4 flex items-center justify-center text-gray-600 bg-black"></div>
   {% endif %}
   <div class="ml-4 flex flex-col">
-    <p class="text-black text-sm text-center uppercase">
+    <p class="text-black text-sm uppercase">
       {% for subject in user.teacher_profile.subjects.all %}
         <span class="mr-1 px-2 py-1 bg-gray-500">{{ subject.name }}</span>{% if not forloop.last %}, {% endif %}
       {% empty %}

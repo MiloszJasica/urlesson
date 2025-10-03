@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import LessonRequest, TeacherAvailability
+from .models import LessonRequest, TeacherAvailabilityPeriod
 from accounts.models import CustomUser, Teacher, Student, Subject
 
 from django.contrib import admin
@@ -85,12 +85,12 @@ class LessonRequestAdmin(admin.ModelAdmin):
         return obj.teacher.email
     teacher_email.short_description = 'Teacher Email'
 
-@admin.register(TeacherAvailability)
-class TeacherAvailabilityAdmin(admin.ModelAdmin):
-    list_display = ('teacher_email', 'day', 'start_time', 'end_time')
-    list_filter = ('day',)
+@admin.register(TeacherAvailabilityPeriod)
+class TeacherAvailabilityPeriodAdmin(admin.ModelAdmin):
+    list_display = ('teacher_email', 'start_datetime', 'end_datetime')
     search_fields = ('teacher__email',)
 
     def teacher_email(self, obj):
         return obj.teacher.email
     teacher_email.short_description = 'Teacher Email'
+    
