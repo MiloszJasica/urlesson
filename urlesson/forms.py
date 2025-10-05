@@ -67,22 +67,27 @@ class TeacherPricingForm(forms.ModelForm):
             'extra_student_group_minute_price': forms.NumberInput(attrs={'step': '0.01'}),
         }
 
+from django import forms
+from .models import LessonRequest, Teacher, Subject
+
 class LessonRequestForm(forms.ModelForm):
+    repeat_weeks = models.IntegerField(default=1)
+
     class Meta:
         model = LessonRequest
-        fields = ['subject', 'date', 'duration_minutes', 'time', 'repeat_weeks']
+        fields = ['subject', 'date', 'duration_minutes', 'time', ]#'repeat_weeks']
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}),
-            'time': forms.TimeInput(attrs={'type': 'time'}),
-            'repeat_weeks': forms.NumberInput(attrs={'min': 1, 'class': 'form-input'}),
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'px-3 py-2 rounded text-black'}),
+            'time': forms.TimeInput(format='%H:%M', attrs={'type': 'time', 'class': 'px-3 py-2 rounded text-black'}),
+            'repeat_weeks': forms.NumberInput(attrs={'min': 1, 'class': 'px-3 py-2 rounded text-black'}),
         }
 
     def __init__(self, *args, **kwargs):
         teacher_user = kwargs.pop('teacher', None)
         super().__init__(*args, **kwargs)
 
-        self.fields['repeat_weeks'].label = "Number of weekly lessons"
-
+        #self.fields['repeat_weeks'].label = "Number of weekly lessons"
+        
         for field in self.fields.values():
             field.widget.attrs.update({
                 'class': 'px-3 py-2 rounded text-black',
@@ -94,6 +99,7 @@ class LessonRequestForm(forms.ModelForm):
                 self.fields['subject'].queryset = teacher_profile.subjects.all()
             except Teacher.DoesNotExist:
                 self.fields['subject'].queryset = Subject.objects.none()
+
 
 class TeacherDayOffForm(forms.ModelForm):
     class Meta:

@@ -7,11 +7,17 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateparse import parse_datetime
-from django.utils import timezone
 from .forms import RecurringAvailabilityForm
 from django.utils.timezone import localtime
-
+from django.utils import timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from .forms import LessonRequestForm, TeacherDayOffForm
+from datetime import datetime, timedelta, timezone as dt_timezone
+from django.contrib import messages
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.auth.decorators import login_required
+from .forms import LessonRequestForm
+from .models import CustomUser, LessonRequest, Teacher, TeacherAvailabilityPeriod
 from .models import (
     CustomUser,
     LessonRequest,
@@ -68,8 +74,8 @@ def teacher_availability_view(request):
                 while current_date <= end_date:
                     weekday_index = str(current_date.weekday())
                     if weekday_index in days_of_week:
-                        start_dt = timezone.make_aware(datetime.combine(current_date, start_time), timezone.get_current_timezone())
-                        end_dt = timezone.make_aware(datetime.combine(current_date, end_time), timezone.get_current_timezone())
+                        start_dt = datetime.combine(current_date, start_time).replace(tzinfo=dt_timezone.utc)
+                        end_dt = datetime.combine(current_date, end_time).replace(tzinfo=dt_timezone.utc)
 
                         overlapping = TeacherAvailabilityPeriod.objects.filter(
                             teacher=request.user,
@@ -109,24 +115,32 @@ def teacher_availability_view(request):
     periods = TeacherAvailabilityPeriod.objects.filter(teacher=teacher)
     days_off = TeacherDayOff.objects.filter(teacher=teacher).order_by("date")
 
+    lessons = LessonRequest.objects.filter(
+        teacher=teacher,
+        status__in=['pending', 'accepted']
+    ).select_related("student", "subject").order_by("date", "time")
+
     return render(request, 'calendar.html', {
         'day_off_form': day_off_form,
         'availability_periods': periods,
         'days_off': days_off,
         'recurring_form': recurring_form,
         'teacher': teacher,
+        'lessons': lessons,
     })
 
 
 @login_required
 def teacher_availability_json(request):
     teacher_id = request.GET.get("teacher_id") or request.user.id
-    periods = TeacherAvailabilityPeriod.objects.filter(teacher_id=teacher_id)
+    teacher = get_object_or_404(CustomUser, id=teacher_id, role="teacher")
+
     events = []
 
+    periods = TeacherAvailabilityPeriod.objects.filter(teacher=teacher)
     for p in periods:
         events.append({
-            "id": p.id,
+            "id": f"avail-{p.id}",
             "start": p.start_datetime.isoformat(),
             "end": p.end_datetime.isoformat(),
             "color": "#28a745",
@@ -134,14 +148,33 @@ def teacher_availability_json(request):
             "type": "availability"
         })
 
+    lessons = LessonRequest.objects.filter(
+        teacher=teacher,
+        status__in=['pending', 'accepted']
+    ).select_related("student", "subject")
+
+    for l in lessons:
+        start_dt = timezone.make_aware(datetime.combine(l.date, l.time), dt_timezone.utc)
+        end_dt = start_dt + timedelta(minutes=l.duration_minutes)
+        events.append({
+            "id": f"lesson-{l.id}",
+            "title": f"{l.subject.name if l.subject else 'Lesson'} with {l.student.get_full_name()}",
+            "start": start_dt.isoformat(),
+            "end": end_dt.isoformat(),
+            "color": "#dc3545",
+            "type": "lesson",
+            "status": l.status
+        })
+
     return JsonResponse(events, safe=False)
+
 
 @csrf_exempt
 def add_availability(request):
     if request.method == "POST":
         data = json.loads(request.body)
-        start = parse_datetime(data.get("start"))
-        end = parse_datetime(data.get("end"))
+        start = parse_datetime(data.get("start").astimezone(timezone.utc))
+        end = parse_datetime(data.get("end").astimezone(timezone.utc))
         teacher_id = data.get("teacher_id")
 
         overlapping = TeacherAvailabilityPeriod.objects.filter(
@@ -184,21 +217,17 @@ def delete_availability(request):
 # Lesson Booking
 # ---------------------------
 
-def is_slot_available(teacher, date, time, duration_minutes):
-    lesson_start = timezone.make_aware(datetime.combine(date, time))
-    lesson_end = lesson_start + timedelta(minutes=duration_minutes)
-
+def is_slot_available_utc(teacher, lesson_start, lesson_end):
     periods = TeacherAvailabilityPeriod.objects.filter(teacher=teacher)
 
     for period in periods:
         if lesson_start >= period.start_datetime and lesson_end <= period.end_datetime:
             conflicting_lessons = LessonRequest.objects.filter(
                 teacher=teacher,
-                date=date,
                 status__in=['pending', 'accepted']
             )
             for lesson in conflicting_lessons:
-                existing_start = timezone.make_aware(datetime.combine(lesson.date, lesson.time))
+                existing_start = datetime.combine(lesson.date, lesson.time, tzinfo=dt_timezone.utc)
                 existing_end = existing_start + timedelta(minutes=lesson.duration_minutes)
                 if lesson_start < existing_end and lesson_end > existing_start:
                     return False
@@ -220,18 +249,22 @@ def book_lesson_view(request, teacher_id):
             lesson.teacher = teacher
 
             try:
-                lesson.date = datetime.strptime(request.POST.get('selected_date'), "%Y-%m-%d").date()
-                lesson.time = datetime.strptime(request.POST.get('selected_time'), "%H:%M").time()
+                lesson_date = datetime.strptime(request.POST.get('selected_date'), "%Y-%m-%d").date()
+                lesson_time = datetime.strptime(request.POST.get('selected_time'), "%H:%M").time()
+                lesson_start = datetime.combine(lesson_date, lesson_time, tzinfo=dt_timezone.utc)
+                lesson_end = lesson_start + timedelta(minutes=lesson.duration_minutes)
             except (TypeError, ValueError):
                 form.add_error(None, "Invalid date or time format.")
                 return render(request, 'book_lesson.html', {'form': form, 'teacher': teacher, 'subject_list': subject_list})
 
             lesson.subject_id = request.POST.get("subject")
 
-            if not is_slot_available(teacher, lesson.date, lesson.time, lesson.duration_minutes):
+            if not is_slot_available_utc(teacher, lesson_start, lesson_end):
                 messages.error(request, "Selected time is unavailable. Please choose a green time slot.")
                 return render(request, 'book_lesson.html', {'form': form, 'teacher': teacher, 'subject_list': subject_list})
 
+            lesson.date = lesson_date
+            lesson.time = lesson_time
             lesson.status = "pending"
             lesson.save()
             messages.success(request, "Lesson successfully booked!")
@@ -246,10 +279,50 @@ def book_lesson_view(request, teacher_id):
         'price_individual': getattr(teacher.teacher_profile, 'price_per_minute_individual', 0),
     })
 
+# ---------------------------
+# Student Calendar
+# ---------------------------
+
+@login_required
+def student_calendar_view(request):
+    lessons = LessonRequest.objects.filter(
+        student=request.user,
+        status__in=['pending', 'accepted']
+    ).select_related("teacher", "subject")
+
+    return render(request, "student_calendar.html", {
+        "lessons": lessons,
+        "student": request.user,
+    })
+
+
+@login_required
+def student_calendar_json(request):
+    lessons = LessonRequest.objects.filter(
+        student=request.user,
+        status__in=['pending', 'accepted']
+    ).select_related("teacher", "subject")
+
+    events = []
+    for lesson in lessons:
+        start_dt = timezone.make_aware(datetime.combine(lesson.date, lesson.time), dt_timezone.utc)
+        end_dt = start_dt + timedelta(minutes=lesson.duration_minutes)
+        events.append({
+            "title": f"{lesson.subject.name if lesson.subject else 'Lesson'} with {lesson.teacher.get_full_name()}",
+            "start": start_dt.isoformat(),
+            "end": end_dt.isoformat(),
+            "color": "#007bff",
+            "type": "lesson"
+        })
+    return JsonResponse(events, safe=False)
+
 
 # ---------------------------
 # Lesson Calendar
 # ---------------------------
+
+from django.utils import timezone
+from datetime import datetime, timedelta
 
 @login_required
 def lesson_calendar_json(request):
@@ -261,22 +334,21 @@ def lesson_calendar_json(request):
         return JsonResponse(events, safe=False)
 
     lessons = LessonRequest.objects.filter(teacher=teacher_user, status__in=['pending', 'accepted'])
-
     periods = TeacherAvailabilityPeriod.objects.filter(teacher=teacher_user)
 
     for period in periods:
         free_slots = [(period.start_datetime, period.end_datetime)]
 
         for lesson in lessons:
-            lesson_start = timezone.make_aware(datetime.combine(lesson.date, lesson.time))
+            lesson_start = datetime.combine(lesson.date, lesson.time, tzinfo=dt_timezone.utc)
             lesson_end = lesson_start + timedelta(minutes=lesson.duration_minutes)
 
             new_free_slots = []
             for slot_start, slot_end in free_slots:
-                if timezone.is_naive(slot_start):
-                    slot_start = timezone.make_aware(slot_start)
-                if timezone.is_naive(slot_end):
-                    slot_end = timezone.make_aware(slot_end)
+                if slot_start.tzinfo is None:
+                    slot_start = slot_start.replace(tzinfo=dt_timezone.utc)
+                if slot_end.tzinfo is None:
+                    slot_end = slot_end.replace(tzinfo=dt_timezone.utc)
 
                 if lesson_end <= slot_start or lesson_start >= slot_end:
                     new_free_slots.append((slot_start, slot_end))
@@ -296,34 +368,28 @@ def lesson_calendar_json(request):
 
             free_slots = new_free_slots
 
-
-        # Dodajemy zielone sloty
         for slot_start, slot_end in free_slots:
             events.append({
                 'start': slot_start.isoformat(),
                 'end': slot_end.isoformat(),
                 'display': 'background',
-                'color': '#28a745',  # zielone
+                'color': '#28a745',
                 'type': 'availability'
             })
 
-    # Dodajemy lekcje samego użytkownika (czerwone)
     for lesson in lessons.filter(student=request.user):
-        start_dt = datetime.combine(lesson.date, lesson.time)
+        start_dt = datetime.combine(lesson.date, lesson.time, tzinfo=dt_timezone.utc)
         end_dt = start_dt + timedelta(minutes=lesson.duration_minutes)
         subject_name = lesson.subject.name if lesson.subject else "Lesson"
         events.append({
             'title': subject_name,
             'start': start_dt.isoformat(),
             'end': end_dt.isoformat(),
-            'color': '#dc3545',  # czerwone
+            'color': '#dc3545',
             'type': 'lesson'
         })
 
     return JsonResponse(events, safe=False)
-
-
-
 
 # ---------------------------
 # Misc

@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="px-32 py-8">
+  <div class="mb-8 border-b border-gray-600">
+    <p class="flex text-5xl font-bold mb-4 justify-center">My Lessons</p>
+  </div>
+  <div id="calendar"></div>
+</div>
+
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet'/>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'timeGridWeek',
+    allDaySlot: false,
+    height: 'auto',
+    scrollTime: '08:00:00',
+    slotMinTime: '06:00:00',
+    slotMaxTime: '22:00:00',
+    timeZone: 'UTC',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    events: "{% url 'student_calendar_json' %}",
+    eventClick: function(info) {
+      alert("Lesson: " + info.event.title + "\nStart: " + info.event.start.toUTCString());
+    }
+  });
+
+  calendar.render();
+});
+</script>
+{% endblock %}
