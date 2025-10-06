@@ -9,8 +9,11 @@
       {% if user.is_student %}
         <a href="{% url 'teacher_list' %}" class="hover:underline ml-8 px-4 py-8 text-3xl underline">Teachers</a>
       {% endif %}
-      {% if user.is_authenticated %}
-      <a href="{% url 'teacher_availability' %}" class="hover:underline ml-2 px-4 py-8 text-3xl underline">Calendar</a>
+      {% if user.is_student %}
+      <a href="{% url 'student_calendar' %}" class="hover:underline ml-2 px-4 py-8 text-3xl underline">Calendar</a>
+      {% endif %}
+      {% if user.is_teacher %}
+      <a href="{% url 'teacher_availability' %}" class="hover:underline ml-2 px-4 py-8 text-3xl underline">My Lessons</a>
       {% endif %}
     </div>
     <div class="flex text-2xl gap-4">
@@ -96,6 +99,6 @@ button.addEventListener('click', () => {
   }
 });
 
-// setInterval(loadNotifications, 10000);
-// loadNotifications();
+//setInterval(loadNotifications, 10000);
+loadNotifications();
 </script>

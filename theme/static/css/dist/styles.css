@@ -1041,6 +1041,10 @@ select {
   width: 100%;
 }
 
+.w-\[400px\] {
+  width: 400px;
+}
+
 .max-w-md {
   max-width: 28rem;
 }
@@ -1275,6 +1279,11 @@ select {
 .bg-yellow-500 {
   --tw-bg-opacity: 1;
   background-color: rgb(234 179 8 / var(--tw-bg-opacity, 1));
+}
+
+.bg-red-600 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1));
 }
 
 .bg-opacity-50 {

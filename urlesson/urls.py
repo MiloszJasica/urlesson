@@ -26,4 +26,5 @@ urlpatterns = [
     path('confirm-lessons/<int:teacher_id>/', views.confirm_lessons_view, name='confirm_lessons'),
     path('add-availability/', views.add_availability, name='add_availability'),
     path('delete-availability/', views.delete_availability, name='delete_availability'),
+    path('update-lesson-status/', views.update_lesson_status, name='update_lesson_status'),
 ]

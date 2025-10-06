@@ -15,3 +15,8 @@ def lesson_request_notification(sender, instance, created, **kwargs):
                 user=instance.student,
                 message=f"Your lesson with {instance.teacher} has been rejected."
             )
+        elif instance.status == "accepted":
+            Notification.objects.create(
+                user=instance.student,
+                message=f"Your lesson with {instance.teacher} has been confirmed."
+            )

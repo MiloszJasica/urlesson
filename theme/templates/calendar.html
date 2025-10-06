@@ -2,11 +2,11 @@
 {% block content %}
 <div class="px-32 py-8">
   <div class="mb-8 border-b border-gray-600">
-    <p class="flex text-5xl font-bold mb-4 justify-center">My Lessons & Availability</p>
+    <p class="flex text-5xl font-bold mb-4 justify-center">My Lessons</p>
   </div>
   <div class="flex grid-cols-2 gap-32">
     <div>
-      <h2 class="text-xl font-bold mt-8 mb-2">Add recurring availability</h2>
+      <h2 class="text-3xl font-bold mt-8 mb-2">Availability</h2>
       <form method="post" class="mb-6">
         {% csrf_token %}
         {{ recurring_form.as_p }}
@@ -14,6 +14,8 @@
         <button type="submit" name="add_recurring" class="px-4 py-2 bg-green-600 text-white rounded-lg">
           Add availability
         </button>
+        <button type="submit" name="delete_recurring" class="px-4 py-2 bg-red-600 text-white rounded-lg">
+          Delete availability
       </form>
       
       {% if recurring_form.errors %}
@@ -24,6 +26,18 @@
     </div>
     <div id='calendar'></div>
   </div>
+      <div id="lesson-action-modal" class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div class="bg-gray-700 p-6 w-[400px] rounded-lg shadow-lg flex flex-col">
+          <h2 class="text-2xl font-bold mb-4" id="modal-title">Lesson Action</h2>
+          <p id="modal-info" class="mb-6 text-white"></p>
+          <div class="flex justify-between">
+            <button id="accept-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg">Accept</button>
+            <button id="reject-btn" class="px-4 py-2 bg-red-600 text-white rounded-lg">Reject</button>
+            <!-- <button id="reschedule-btn" class="px-4 py-2 bg-yellow-500 text-black rounded-lg">Reschedule</button> -->
+          </div>
+          <button id="close-modal" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg">Close</button>
+        </div>
+      </div>
 </div>
 
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
@@ -31,24 +45,21 @@
 
 <script>
 const csrftoken = "{{ csrf_token }}";
+let currentLessonId = null;
 
 document.addEventListener('DOMContentLoaded', function () {
   const calendarEl = document.getElementById('calendar');
   const calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: 'timeGridWeek',
-    allDaySlot: false,
     selectable: true,
     height: 'auto',
-    scrollTime: '08:00:00',
-    slotMinTime: '06:00:00',
-    slotMaxTime: '22:00:00',
-    timeZone: 'UTC',
+    allDaySlot: false,
     headerToolbar: {
       left: 'prev,next today',
       center: 'title',
       right: 'dayGridMonth,timeGridWeek,timeGridDay'
     },
-    events: function(fetchInfo, successCallback, failureCallback) {
+    events: function(fetchInfo, successCallback) {
       fetch("{% url 'teacher_availability_json' %}?teacher_id={{ teacher.id }}")
         .then(res => res.json())
         .then(avails => {
@@ -69,19 +80,12 @@ document.addEventListener('DOMContentLoaded', function () {
           "X-CSRFToken": csrftoken
         },
         body: JSON.stringify({
-          start: info.start.toISOString(), 
+          start: info.start.toISOString(),
           end: info.end.toISOString(),
           teacher_id: "{{ teacher.id }}"
         })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if(data.success) {
-          calendar.refetchEvents();
-        } else {
-          alert("Could not add availability.");
-        }
-      });
+      }).then(res => res.json())
+        .then(data => { if(data.success) calendar.refetchEvents(); });
     },
     eventClick: function(info) {
       if (info.event.extendedProps.type === "availability") {
@@ -93,19 +97,60 @@ document.addEventListener('DOMContentLoaded', function () {
               "X-CSRFToken": csrftoken
             },
             body: JSON.stringify({ id: info.event.id })
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success) {
-              info.event.remove();
-            }
-          });
+          }).then(res => res.json())
+            .then(data => { if(data.success) info.event.remove(); });
         }
+      } else if (info.event.extendedProps.type === "lesson") {
+        currentLessonId = info.event.id.replace("lesson-", "");
+        const status = info.event.extendedProps.status;
+        if (status !== "pending") return; // only pending lessons can be managed        
+        const startStr = info.event.start.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+        const endStr = info.event.end.toLocaleString([], { timeStyle: 'short',  });
+        // maybe add more info about student
+        document.getElementById('modal-title').innerText = `Lesson ${startStr} - ${endStr}`;
+        document.getElementById('lesson-action-modal').classList.remove('hidden');
       }
     }
   });
 
   calendar.render();
+
+  // Modal buttons
+  document.getElementById('accept-btn').addEventListener('click', () => updateLessonStatus('accept'));
+  document.getElementById('reject-btn').addEventListener('click', () => updateLessonStatus('reject'));
+  document.getElementById('reschedule-btn').addEventListener('click', () => {
+    let newDate = prompt("Enter new date & time (YYYY-MM-DD HH:MM):");
+    if (!newDate) return;
+    const newStart = new Date(newDate);
+    const newEnd = new Date(newStart.getTime() + (calendar.getEventById('lesson-' + currentLessonId).end - calendar.getEventById('lesson-' + currentLessonId).start));
+    updateLessonStatus('reschedule', newStart.toISOString(), newEnd.toISOString());
+  });
+  document.getElementById('close-modal').addEventListener('click', () => document.getElementById('lesson-action-modal').classList.add('hidden'));
+
+  function updateLessonStatus(action, new_start=null, new_end=null) {
+    fetch("{% url 'update_lesson_status' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrftoken
+      },
+      body: JSON.stringify({
+        id: currentLessonId,
+        action: action,
+        new_start: new_start,
+        new_end: new_end
+      })
+    }).then(res => res.json())
+      .then(data => {
+        if(data.success) {
+          calendar.refetchEvents();
+          document.getElementById('lesson-action-modal').classList.add('hidden');
+        } else {
+          alert("Could not update lesson.");
+        }
+      });
+  }
 });
 </script>
+
 {% endblock %}

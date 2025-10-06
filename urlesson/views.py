@@ -110,6 +110,74 @@ def teacher_availability_view(request):
                 return redirect('teacher_availability')
             else:
                 messages.error(request, "Form is invalid. Please check the input.")
+        elif 'delete_recurring' in request.POST:
+            recurring_form = RecurringAvailabilityForm(request.POST)
+            if recurring_form.is_valid():
+                days_of_week = recurring_form.cleaned_data['days_of_week']
+                start_time = recurring_form.cleaned_data['start_time']
+                end_time = recurring_form.cleaned_data['end_time']
+                start_date = recurring_form.cleaned_data['start_date']
+                end_date = recurring_form.cleaned_data['end_date']
+
+                current_date = start_date
+                deleted_slots = 0
+
+                while current_date <= end_date:
+                    weekday_index = str(current_date.weekday())
+                    if weekday_index in days_of_week:
+                        start_dt = datetime.combine(current_date, start_time).replace(tzinfo=dt_timezone.utc)
+                        end_dt = datetime.combine(current_date, end_time).replace(tzinfo=dt_timezone.utc)
+
+                        slots = TeacherAvailabilityPeriod.objects.filter(
+                            teacher=request.user,
+                            start_datetime__lt=end_dt,
+                            end_datetime__gt=start_dt
+                        )
+
+                        for slot in slots:
+                            if slot.start_datetime >= start_dt and slot.end_datetime <= end_dt:
+                                slot.delete()
+                                deleted_slots += 1
+                                continue
+
+                            if slot.start_datetime < start_dt and slot.end_datetime > end_dt:
+                                TeacherAvailabilityPeriod.objects.create(
+                                    teacher=request.user,
+                                    start_datetime=slot.start_datetime,
+                                    end_datetime=start_dt
+                                )
+                                TeacherAvailabilityPeriod.objects.create(
+                                    teacher=request.user,
+                                    start_datetime=end_dt,
+                                    end_datetime=slot.end_datetime
+                                )
+                                slot.delete()
+                                deleted_slots += 1
+                                continue
+
+                            if slot.start_datetime < end_dt <= slot.end_datetime:
+                                slot.start_datetime = end_dt
+                                slot.save()
+                                deleted_slots += 1
+                                continue
+
+                            if slot.start_datetime <= start_dt < slot.end_datetime:
+                                slot.end_datetime = start_dt
+                                slot.save()
+                                deleted_slots += 1
+                                continue
+
+                    current_date += timedelta(days=1)
+
+                if deleted_slots > 0:
+                    messages.success(request, f"Deleted or adjusted {deleted_slots} availability slot(s).")
+                else:
+                    messages.info(request, "No availability found to delete.")
+            else:
+                messages.error(request, "Form is invalid. Please check your input.")
+
+            return redirect('teacher_availability')
+
 
     teacher = request.user
     periods = TeacherAvailabilityPeriod.objects.filter(teacher=teacher)
@@ -156,15 +224,23 @@ def teacher_availability_json(request):
     for l in lessons:
         start_dt = timezone.make_aware(datetime.combine(l.date, l.time), dt_timezone.utc)
         end_dt = start_dt + timedelta(minutes=l.duration_minutes)
+
+        color_map = {
+            "pending": "#dc3545",   # red
+            "accepted": "#28a745",  # green
+            "rejected": "#6c757d"   # grey
+        }
+
         events.append({
             "id": f"lesson-{l.id}",
             "title": f"{l.subject.name if l.subject else 'Lesson'} with {l.student.get_full_name()}",
             "start": start_dt.isoformat(),
             "end": end_dt.isoformat(),
-            "color": "#dc3545",
+            "color": color_map.get(l.status, "#007bff"),
             "type": "lesson",
             "status": l.status
         })
+
 
     return JsonResponse(events, safe=False)
 
@@ -173,9 +249,17 @@ def teacher_availability_json(request):
 def add_availability(request):
     if request.method == "POST":
         data = json.loads(request.body)
-        start = parse_datetime(data.get("start").astimezone(timezone.utc))
-        end = parse_datetime(data.get("end").astimezone(timezone.utc))
+        start_str = data.get("start")
+        end_str = data.get("end")
         teacher_id = data.get("teacher_id")
+
+        start = parse_datetime(start_str)
+        end = parse_datetime(end_str)
+
+        if timezone.is_naive(start):
+            start = timezone.make_aware(start, timezone=timezone.utc)
+        if timezone.is_naive(end):
+            end = timezone.make_aware(end, timezone=timezone.utc)
 
         overlapping = TeacherAvailabilityPeriod.objects.filter(
             teacher_id=teacher_id,
@@ -203,12 +287,16 @@ def add_availability(request):
 
     return JsonResponse({"success": False}, status=400)
 
-@csrf_exempt
 @login_required
 def delete_availability(request):
     if request.method == "POST":
         data = json.loads(request.body)
         availability_id = data.get("id")
+
+        # jeśli id ma formę "avail-123", wyciągnij numer
+        if isinstance(availability_id, str) and availability_id.startswith("avail-"):
+            availability_id = int(availability_id.replace("avail-", ""))
+
         TeacherAvailabilityPeriod.objects.filter(id=availability_id, teacher=request.user).delete()
         return JsonResponse({"success": True})
     return JsonResponse({"success": False}, status=400)
@@ -268,7 +356,7 @@ def book_lesson_view(request, teacher_id):
             lesson.status = "pending"
             lesson.save()
             messages.success(request, "Lesson successfully booked!")
-            return redirect('calendar')
+            return redirect('student_calendar')
     else:
         form = LessonRequestForm(teacher=teacher)
 
@@ -278,6 +366,44 @@ def book_lesson_view(request, teacher_id):
         'subject_list': subject_list,
         'price_individual': getattr(teacher.teacher_profile, 'price_per_minute_individual', 0),
     })
+
+@login_required
+@csrf_exempt
+def update_lesson_status(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        lesson_id = data.get("id")
+        action = data.get("action")
+
+        lesson = get_object_or_404(LessonRequest, id=lesson_id, teacher=request.user)
+
+        if lesson.status == "pending":
+            if action == "accept":
+                lesson.status = "accepted"
+                lesson.save()
+                return JsonResponse({"success": True, "status": "accepted"})
+
+            elif action == "reject":
+                lesson.status = "rejected"
+                lesson.save()
+                return JsonResponse({"success": True, "status": "rejected"})
+
+            # elif action == "reschedule":
+            #     new_start = parse_datetime(data.get("new_start"))
+            #     new_end = parse_datetime(data.get("new_end"))
+
+            #     if new_start and new_end:
+            #         lesson.date = new_start.date()
+            #         lesson.time = new_start.time()
+            #         lesson.status = "pending"
+            #         lesson.save()
+            #         return JsonResponse({"success": True, "status": "pending"})
+
+            #     return JsonResponse({"success": False, "error": "Invalid datetime"}, status=400)
+
+            return JsonResponse({"success": False, "error": "Invalid action"}, status=400)
+
+    return JsonResponse({"success": False, "error": "Invalid method"}, status=405)
 
 # ---------------------------
 # Student Calendar
@@ -304,6 +430,12 @@ def student_calendar_json(request):
     ).select_related("teacher", "subject")
 
     events = []
+    color_map = {
+            "pending": "#007bff",   # blue
+            "accepted": "#28a745",  # green
+            "rejected": "#6c757d"   # grey
+        }
+        
     for lesson in lessons:
         start_dt = timezone.make_aware(datetime.combine(lesson.date, lesson.time), dt_timezone.utc)
         end_dt = start_dt + timedelta(minutes=lesson.duration_minutes)
@@ -311,9 +443,10 @@ def student_calendar_json(request):
             "title": f"{lesson.subject.name if lesson.subject else 'Lesson'} with {lesson.teacher.get_full_name()}",
             "start": start_dt.isoformat(),
             "end": end_dt.isoformat(),
-            "color": "#007bff",
+            "color": color_map.get(lesson.status, "#007bff"),
             "type": "lesson"
         })
+
     return JsonResponse(events, safe=False)
 
 
