@@ -12,12 +12,16 @@
       {% if user.is_authenticated %}
       <a href="{% url 'teacher_availability' %}" class="hover:underline ml-2 px-4 py-8 text-3xl underline">Calendar</a>
       {% endif %}
-      {% if user.is_teacher %}
-        <a href="{% url 'teacher_availability' %}" class="hover:underline ml-2 px-4 py-8 text-3xl underline">Availability</a>
-      {% endif %}
     </div>
     <div class="flex text-2xl gap-4">
       {% if user.is_authenticated %}
+        <div class="relative pr-4">
+          <button id="notifications-button" class="relative p-2">
+            <span id="bell-icon" class="material-symbols-outlined text-3xl">notifications</span>
+            <span id="notifications-count" class="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full px-1"></span>
+          </button>
+          <div id="notifications-dropdown" class="hidden absolute right-0 mt-2 w-64 bg-gray-800 text-white rounded shadow-lg z-50"></div>
+        </div>
         <a href="{% url 'profile' %}" class="bg-green-500 text-black hover:bg-blue-500 text-3xl px-4 py-2 border-black rounded">My Profile</a>
         <form action="{% url 'accounts:logout' %}" method="post" class="inline">
             {% csrf_token %}
@@ -34,3 +38,64 @@
     </div>
   </div>
 </nav>
+<script>
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== "") {
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.startsWith(name + "=")) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+const button = document.getElementById('notifications-button');
+const dropdown = document.getElementById('notifications-dropdown');
+const countSpan = document.getElementById('notifications-count');
+
+async function loadNotifications() {
+  try {
+    const res = await fetch("{% url 'notifications_json' %}");
+    const data = await res.json();
+
+    dropdown.innerHTML = data.map(n => `
+      <div class="px-4 py-2 hover:bg-gray-700 border-b border-gray-600">
+        ${n.message}
+      </div>
+    `).join("");
+
+    const unreadCount = data.filter(n => !n.read).length;
+    countSpan.textContent = unreadCount;
+    countSpan.style.display = unreadCount ? "inline-block" : "none";
+
+  } catch (err) {
+    console.error("Error:", err);
+  }
+}
+
+button.addEventListener('click', () => {
+  dropdown.classList.toggle('hidden');
+
+  if (!dropdown.classList.contains('hidden')) {
+    countSpan.textContent = 0;
+    countSpan.style.display = 'none';
+
+    fetch("{% url 'mark_notifications_read' %}", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": getCookie("csrftoken"),
+        "Content-Type": "application/json"
+      },
+    })
+    .then(res => res.json())
+  }
+});
+
+// setInterval(loadNotifications, 10000);
+// loadNotifications();
+</script>

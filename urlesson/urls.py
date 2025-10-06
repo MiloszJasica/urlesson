@@ -13,6 +13,7 @@ from .forms import EmailAuthenticationForm, RecurringAvailabilityForm, TeacherDa
 urlpatterns = [
     path('', views.home, name='home'),
     path('accounts/', include('accounts.urls', namespace='accounts')),
+    path('notifications/', include('notifications.urls')),
     path('users/', views.teacher_list_view, name='teacher_list'),
     path("profile/", profile_view, name="profile"),
     path('teacher/pricing/', edit_pricing_view, name='teacher_pricing'),
