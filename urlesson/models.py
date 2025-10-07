@@ -1,10 +1,8 @@
-from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.conf import settings
 from decimal import Decimal
-from accounts.models import CustomUser, Teacher, Student, Subject
+from accounts.models import CustomUser, Subject
 
-from django.contrib.auth.base_user import BaseUserManager
 
 class LessonRequest(models.Model):
     student = models.ForeignKey(

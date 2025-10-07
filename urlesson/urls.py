@@ -1,13 +1,8 @@
 from django.urls import path, include
 from . import views
-from django.contrib.auth.views import LogoutView
 from accounts.views import edit_pricing_view
-from .views import book_lesson_view
-from django.contrib.auth import views as auth_views
 from accounts.views import profile_view
 from .views import student_calendar_view, student_calendar_json
-from accounts.views import calendar_view
-from .forms import EmailAuthenticationForm, RecurringAvailabilityForm, TeacherDayOffForm
 
 
 urlpatterns = [

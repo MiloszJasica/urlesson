@@ -2,13 +2,15 @@ from django.shortcuts import render
 
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from .forms import CustomUserCreationForm, EmailAuthenticationForm
-from .models import CustomUser, Teacher, Student
+from .models import CustomUser, Teacher
 from .forms import TeacherExtraForm, StudentExtraForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth import update_session_auth_hash
+from urlesson.forms import TeacherPricingForm
 
 #ACCOUNT CREATION AND LOGIN VIEWS
 
@@ -45,7 +47,6 @@ def register_extra_view(request):
     user = get_object_or_404(CustomUser, id=user_id)
 
     ExtraFormClass = TeacherExtraForm if role == 'teacher' else StudentExtraForm
-    profile_model = Teacher if role == 'teacher' else Student
 
     if request.method == 'POST':
         form = ExtraFormClass(request.POST)

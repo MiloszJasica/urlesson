@@ -1,17 +1,14 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth import authenticate, get_user_model
-from django.forms.widgets import DateInput
-from .models import CustomUser, LessonRequest
+from .models import LessonRequest
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
-from django.contrib.auth.forms import SetPasswordForm
-from django import forms
-from .models import TeacherDayOff, LessonRequest
+from .models import TeacherDayOff
 from django.db import models
-from django import forms
-from accounts.models import Teacher, Student
+from accounts.models import Teacher
 from .models import TeacherAvailabilityPeriod
+from accounts.models import Subject
 
 User = get_user_model()
             
@@ -66,9 +63,6 @@ class TeacherPricingForm(forms.ModelForm):
             'price_per_minute_group': forms.NumberInput(attrs={'step': '0.01'}),
             'extra_student_group_minute_price': forms.NumberInput(attrs={'step': '0.01'}),
         }
-
-from django import forms
-from .models import LessonRequest, Teacher, Subject
 
 class LessonRequestForm(forms.ModelForm):
     repeat_weeks = models.IntegerField(default=1)

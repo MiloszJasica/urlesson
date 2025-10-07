@@ -8,22 +8,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateparse import parse_datetime
 from .forms import RecurringAvailabilityForm
-from django.utils.timezone import localtime
 from django.utils import timezone
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import timezone as dt_timezone
 from .forms import LessonRequestForm, TeacherDayOffForm
-from datetime import datetime, timedelta, timezone as dt_timezone
-from django.contrib import messages
-from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib.auth.decorators import login_required
-from .forms import LessonRequestForm
-from .models import CustomUser, LessonRequest, Teacher, TeacherAvailabilityPeriod
+from .models import CustomUser, LessonRequest, TeacherAvailabilityPeriod
+from accounts.models import Teacher
 from .models import (
-    CustomUser,
-    LessonRequest,
-    Teacher,
-    TeacherDayOff,
-    TeacherAvailabilityPeriod
+    TeacherDayOff
 )
 
 # ---------------------------
@@ -221,9 +212,9 @@ def teacher_availability_json(request):
         status__in=['pending', 'accepted']
     ).select_related("student", "subject")
 
-    for l in lessons:
-        start_dt = timezone.make_aware(datetime.combine(l.date, l.time), dt_timezone.utc)
-        end_dt = start_dt + timedelta(minutes=l.duration_minutes)
+    for lesson in lessons:
+        start_dt = timezone.make_aware(datetime.combine(lesson.date, lesson.time), dt_timezone.utc)
+        end_dt = start_dt + timedelta(minutes=lesson.duration_minutes)
 
         color_map = {
             "pending": "#dc3545",   # red
@@ -232,13 +223,13 @@ def teacher_availability_json(request):
         }
 
         events.append({
-            "id": f"lesson-{l.id}",
-            "title": f"{l.subject.name if l.subject else 'Lesson'} with {l.student.get_full_name()}",
+            "id": f"lesson-{lesson.id}",
+            "title": f"{lesson.subject.name if lesson.subject else 'Lesson'} with {lesson.student.get_full_name()}",
             "start": start_dt.isoformat(),
             "end": end_dt.isoformat(),
-            "color": color_map.get(l.status, "#007bff"),
+            "color": color_map.get(lesson.status, "#007bff"),
             "type": "lesson",
-            "status": l.status
+            "status": lesson.status
         })
 
 
@@ -454,8 +445,6 @@ def student_calendar_json(request):
 # Lesson Calendar
 # ---------------------------
 
-from django.utils import timezone
-from datetime import datetime, timedelta
 
 @login_required
 def lesson_calendar_json(request):
