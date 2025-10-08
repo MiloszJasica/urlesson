@@ -62,6 +62,7 @@ class CustomUser(AbstractUser):
 
     def is_student(self):
         return self.role == 'student'
+    
 class Teacher(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='teacher_profile')
     subjects = models.ManyToManyField(Subject, blank=True)

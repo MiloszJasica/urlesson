@@ -372,10 +372,12 @@ def update_lesson_status(request):
             if action == "accept":
                 lesson.status = "accepted"
                 lesson.save()
+                messages.success(request, "Lesson accepted.")
                 return JsonResponse({"success": True, "status": "accepted"})
 
             elif action == "reject":
                 lesson.status = "rejected"
+                messages.success(request, "Lesson rejected.")
                 lesson.save()
                 return JsonResponse({"success": True, "status": "rejected"})
 
@@ -393,6 +395,27 @@ def update_lesson_status(request):
             #     return JsonResponse({"success": False, "error": "Invalid datetime"}, status=400)
 
             return JsonResponse({"success": False, "error": "Invalid action"}, status=400)
+
+    return JsonResponse({"success": False, "error": "Invalid method"}, status=405)
+
+@login_required
+@csrf_exempt
+def update_lesson_status_student(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        lesson_id = data.get("id")
+        action = data.get("action")
+
+        lesson = get_object_or_404(LessonRequest, id=lesson_id, student=request.user)
+
+        if lesson.status == "pending" and action == "cancel":
+            messages.success(request, "Lesson successfully canceled.")
+            lesson.status = "canceled"
+            lesson.save()
+
+            return JsonResponse({"success": True, "status": "canceled"})
+
+        return JsonResponse({"success": False, "error": "Invalid action or status"}, status=400)
 
     return JsonResponse({"success": False, "error": "Invalid method"}, status=405)
 
@@ -424,18 +447,21 @@ def student_calendar_json(request):
     color_map = {
             "pending": "#007bff",   # blue
             "accepted": "#28a745",  # green
-            "rejected": "#6c757d"   # grey
+            "rejected": "#6c757d",   # grey
+            "canceled": "#6c757d"   # grey
         }
         
     for lesson in lessons:
         start_dt = timezone.make_aware(datetime.combine(lesson.date, lesson.time), dt_timezone.utc)
         end_dt = start_dt + timedelta(minutes=lesson.duration_minutes)
         events.append({
+            "id": f"lesson-{lesson.id}",
             "title": f"{lesson.subject.name if lesson.subject else 'Lesson'} with {lesson.teacher.get_full_name()}",
             "start": start_dt.isoformat(),
             "end": end_dt.isoformat(),
             "color": color_map.get(lesson.status, "#007bff"),
-            "type": "lesson"
+            "type": "lesson",
+            "status": lesson.status,
         })
 
     return JsonResponse(events, safe=False)

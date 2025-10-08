@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'notifications',
     'accounts',
+    'messeges_app',
 ]
 
 TAILWIND_APP_NAME = 'theme'

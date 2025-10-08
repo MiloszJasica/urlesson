@@ -43,6 +43,7 @@ class LessonRequest(models.Model):
         ('pending', 'Pending'),
         ('accepted', 'Accepted'),
         ('rejected', 'Rejected'),
+        ('canceled', 'Canceled'),
     ], default='pending')
 
     created_at = models.DateTimeField(auto_now_add=True)

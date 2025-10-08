@@ -8,7 +8,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 class CustomUserAdmin(BaseUserAdmin):
     model = CustomUser
     
-    list_display = ('email', 'role', 'is_staff', 'is_superuser')
+    list_display = ('email', 'first_name', 'last_name', 'role', 'is_staff', 'is_superuser')
     list_filter = ('role', 'is_staff', 'is_superuser')
     fieldsets = (
         (None, {'fields': ('email', 'password', 'role')}),
@@ -17,7 +17,7 @@ class CustomUserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'role', 'password1', 'password2', 'is_active', 'is_staff', 'is_superuser')}
+            'fields': ('email', 'role','first_name', 'last_name', 'password1', 'password2', 'is_active', 'is_staff', 'is_superuser')}
         ),
     )
     search_fields = ('email',)
